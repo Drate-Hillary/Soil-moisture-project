@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+
+    {% load static%}
+    <link rel="stylesheet" type="text/css" href="{% static 'css/login.css' %}">
+</head>
+
+<body>
+    <div class="login-container">
+        <h2>Welcome to AgriFarm</h2>
+        
+        {% if error %}
+        <div class="error-message">{{ error }}</div>
+        {% endif %}
+        
+        <form method="post" class="form-container">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required placeholder="Enter your email">
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <div class="password-container">
+                    <input type="password" name="password" id="password" required placeholder="Enter your password">
+                    <span class="toggle-password" onclick="togglePassword()">👁️</span>
+                </div>
+                <a href="{% url 'password_reset' %}" class="auth-link forgot-password">Forgot Password?</a>
+            </div>
+            
+            <button type="submit" class="login-btn">Sign In</button>
+        </form>
+        
+        <div class="links-container">
+            Don't have an account? <a href="{% url 'register' %}" class="auth-link">Sign Up</a>
+        </div>
+    </div>
+
+    <script>
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const toggleIcon = document.querySelector('.toggle-password');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleIcon.textContent = '👁️';
+            } else {
+                passwordInput.type = 'password';
+                toggleIcon.textContent = '👁️';
+            }
+        }
+        
+        // Simulate loading state for demo
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const btn = document.querySelector('.login-btn');
+            btn.classList.add('loading');
+            
+            // In a real app, you would remove this timeout and handle the actual form submission
+            setTimeout(() => {
+                btn.classList.remove('loading');
+            }, 2000);
+        });
+    </script>
+</body>
+
+</html>
