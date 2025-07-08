@@ -1,66 +1,93 @@
 from django.shortcuts import render, redirect
-from django.contrib.auth import login
+from django.contrib.auth import authenticate, login, logout
 from django.core.mail import send_mail
 from django.conf import settings
 from .forms import CustomUserCreationForm
-from django.contrib.auth import authenticate, login, logout
-from .templates.accounts.decorators import role_required
+from .decorators import role_required
+from django.contrib.auth.decorators import login_required
+import logging
 
+logger = logging.getLogger(__name__)
+
+def home(request):
+    return render(request, 'home.html')
 
 def register(request):
     if request.method == 'POST':
         form = CustomUserCreationForm(request.POST)
         if form.is_valid():
             user = form.save()
-            login(request, user)
+            login(request, user, backend='django.contrib.auth.backends.ModelBackend')
             # Send email notification
-            send_mail(
-                subject='Welcome to Farm System!',
-                message=f'Hi {user.username},\n\nYour account has been created successfully!',
-                from_email=settings.EMAIL_HOST_USER,
-                recipient_list=[user.email],
-                fail_silently=False,
-            )
-            return redirect('home')  # Redirect to home or dashboard
+            try:
+                send_mail(
+                    subject='Welcome to Farm System!',
+                    message=f'Hi {user.username},\n\nYour account has been created successfully!',
+                    from_email=settings.EMAIL_HOST_USER,
+                    recipient_list=[user.email],
+                    fail_silently=False,
+                )
+                logger.info(f"Welcome email sent to {user.email}")
+            except Exception as e:
+                logger.error(f"Failed to send email to {user.email}: {e}")
+            if user.role == 'admin':
+                return redirect('admin_dashboard')
+            elif user.role == 'farmer':
+                return redirect('farmer_dashboard')
+            elif user.role == 'technician':
+                return redirect('technician_dashboard')
+            else:
+                return redirect('home')
+        else:
+            logger.error(f"Form validation failed: {form.errors}")
     else:
+     
         form = CustomUserCreationForm()
     return render(request, 'accounts/register.html', {'form': form})
-
 
 def user_login(request):
     if request.method == 'POST':
         email = request.POST.get('email')
         password = request.POST.get('password')
+        logger.debug(f"Attempting login with email: {email}")
         user = authenticate(request, email=email, password=password)
         if user is not None:
+            logger.debug(f"User authenticated: {user.email}")
             login(request, user)
-            return redirect('home')
+            if user.role == 'admin':
+                return redirect('admin_dashboard')
+            elif user.role == 'farmer':
+                return redirect('farmer_dashboard')
+            elif user.role == 'technician':
+                return redirect('technician_dashboard')
+            else:
+                return redirect('home')
         else:
+            logger.error(f"Authentication failed for email: {email}")
             return render(request, 'accounts/login.html', {'error': 'Invalid credentials'})
     return render(request, 'accounts/login.html')
-
 
 def user_logout(request):
     logout(request)
     return redirect('login')
 
-
-
 @role_required('admin')
 def admin_dashboard(request):
-    return render(request, 'accounts/admin_dashboard.html', {'user': request.user})
+    return render(request, 'dashboards/admin_dashboard.html', {'user': request.user})
 
 @role_required('farmer')
 def farmer_dashboard(request):
-    return render(request, 'accounts/farmer_dashboard.html', {'user': request.user})
+    return render(request, 'dashboards/farmer_dashboard.html', {'user': request.user})
 
-from django.contrib.auth.decorators import login_required
+@role_required('technician')
+def technician_dashboard(request):
+    return render(request, 'dashboards/technician_dashboard.html', {'user': request.user})
 
 @login_required
 def profile(request):
     if request.method == 'POST':
         user = request.user
-        user.email = request.POST.get('email')
+        user.email = request.POST.get('email').lower()
         user.username = request.POST.get('username')
         user.save()
         return redirect('profile')

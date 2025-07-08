@@ -11,7 +11,15 @@ class CustomUserCreationForm(UserCreationForm):
         fields = ['email', 'username', 'role', 'password1', 'password2']
 
     def clean_email(self):
-        email = self.cleaned_data.get('email')
+        email = self.cleaned_data.get('email').lower()
         if CustomUser.objects.filter(email=email).exists():
             raise forms.ValidationError("This email is already registered.")
         return email
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.email = self.cleaned_data['email'].lower()
+        user.role = self.cleaned_data['role']
+        if commit:
+            user.save()
+        return user

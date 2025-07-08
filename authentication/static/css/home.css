@@ -1,0 +1,165 @@
+:root {
+    --primary-color: #4CAF50;
+    --primary-dark: #388E3C;
+    --secondary-color: #FFC107;
+    --light-color: #F1F8E9;
+    --dark-color: #2E7D32;
+    --text-color: #333;
+    --text-light: #fff;
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --transition: all 0.4s ease;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background-color: #f5f5f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+.head {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.8rem;
+    gap: 1rem;
+}
+
+.head img {
+    width: 60px;
+    height: 60px;
+    margin-bottom: 1rem;
+}
+
+.head h1 {
+    font-size: 2.2rem;
+    color: var(--dark-color);
+}
+
+.card-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2rem;
+    padding: 0 1rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    margin-top: 2.5rem;
+}
+
+.card {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+    flex: 1 1 200px;
+    max-width: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border: 1px solid var(--primary-color);
+    padding: 6px;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+}
+
+.card h3 {
+    color: var(--dark-color);
+    font-size: 1.2rem;
+    text-align: center;
+    padding: 0.2rem;
+}
+
+.content {
+    flex-grow: 1;
+    padding: 0.3rem;
+}
+
+.content p {
+    color: #555;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.submit-btn {
+    display: block;
+    padding: 0.5rem;
+    border: none;
+    background-color: var(--primary-color);
+    color: white;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    width: 100%;
+    margin-top: auto;
+    border-radius: 4px;
+    text-decoration: none;
+    text-align: center;
+}
+
+.submit-btn:hover {
+    background-color: var(--primary-dark);
+}
+
+@media (max-width: 768px) {
+
+    .head {
+        margin-top: 1rem;
+    }
+
+    .head h1 {
+        font-size: 1.5rem;
+    }
+
+    .card-container {
+        flex-direction: column;
+        align-items: center;
+        margin-top: 0.8rem;
+        margin-bottom: 1rem;
+    }
+
+    .card {
+        width: 100%;
+        max-width: 300px;
+    }
+
+}
+
+@media (max-width: 480px) {
+    .head {
+        padding: 0.5rem;
+    }
+
+    .head h1 {
+        font-size: 1.2rem;
+    }
+
+    .card h3 {
+        font-size: 1rem;
+        padding: 0.2rem;
+    }
+
+    .content {
+        padding: 0.5rem;
+        font-size: 0.65rem;
+    }
+
+    .submit-btn {
+        padding: 0.5rem;
+        font-size: 0.8rem;
+    }
+
+}

@@ -30,7 +30,9 @@
                 <label for="password">Password</label>
                 <div class="password-container">
                     <input type="password" name="password" id="password" required placeholder="Enter your password">
-                    <span class="toggle-password" onclick="togglePassword()">👁️</span>
+                    <span class="toggle-password" onclick="togglePassword()">
+                        <img src="{% static 'images/visibilityOff.svg' %}" alt="">
+                    </span>
                 </div>
                 <a href="{% url 'password_reset' %}" class="auth-link forgot-password">Forgot Password?</a>
             </div>
@@ -46,14 +48,14 @@
     <script>
         function togglePassword() {
             const passwordInput = document.getElementById('password');
-            const toggleIcon = document.querySelector('.toggle-password');
+            const toggleIcon = document.querySelector('.toggle-password img');
             
             if (passwordInput.type === 'password') {
                 passwordInput.type = 'text';
-                toggleIcon.textContent = '👁️';
+                toggleIcon.textContent = "{% static 'images/visibilityOn.svg' %}";
             } else {
                 passwordInput.type = 'password';
-                toggleIcon.textContent = '👁️';
+                toggleIcon.textContent = "{% static 'images/visibilityOff.svg' %}";
             }
         }
         
