@@ -11,6 +11,12 @@ import io
 from django.contrib import messages
 from .models import SoilMoistureRecord
 from datetime import datetime
+from .ml_model import predict_soil_moisture
+import os
+import requests
+from .ml_model import train_model
+
+weather_api = os.getenv("OPENWEATHER_API_KEY")
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +84,44 @@ def user_logout(request):
 
 @role_required('admin')
 def admin_dashboard(request):
-    return render(request, 'dashboards/admin_dashboard.html', {'user': request.user})
+    # Get filter parameters
+    location = request.GET.get('location', '')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
+
+    # Query soil moisture records
+    records = SoilMoistureRecord.objects.all().order_by('-timestamp')
+
+    # Apply filters
+    if location:
+        records = records.filter(location=location)
+    
+    if start_date:
+        try:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d')
+            records = records.filter(timestamp__gte=start_date)
+        except ValueError:
+            messages.error(request, 'Invalid start date format.')
+    
+    if end_date:
+        try:
+            end_date = datetime.strptime(end_date, '%Y-%m-%d')
+            records = records.filter(timestamp__lte=end_date)
+        except ValueError:
+            messages.error(request, 'Invalid end date format.')
+
+    # Get unique locations for dropdown
+    locations = SoilMoistureRecord.objects.values_list('location', flat=True).distinct()
+
+    context = {
+        'user': request.user,
+        'records': records,
+        'locations': locations,
+        'selected_location': location,
+        'start_date': start_date,
+        'end_date': end_date,
+    }
+    return render(request, 'dashboards/admin_dashboard.html', context)
 
 @role_required('farmer')
 def farmer_dashboard(request):
@@ -101,7 +144,6 @@ def profile(request):
 
 
 # Uploading the csv file to the database
-
 def upload_csv(request):
     if request.method == 'POST':
         csv_file = request.FILES.get('csv-upload')
@@ -162,3 +204,102 @@ def upload_csv(request):
             return redirect('admin_dashboard')
 
     return render(request, 'admin_dashboard')
+
+
+# Upload a ml model
+@login_required
+@role_required('admin')
+def upload_model(request):
+    if request.method == 'POST':
+        model_file = request.FILES.get('ml-model-upload')
+        if not model_file:
+            messages.error(request, 'No file uploaded.')
+            return redirect('admin_dashboard')
+        
+        if not model_file.name.endswith(('.pkl', '.h5')):
+            messages.error(request, 'Please upload a valid model file (.pkl or .h5).')
+            return redirect('admin_dashboard')
+        
+        try:
+            # Save the model file
+            model_path = os.path.join(settings.BASE_DIR, 'models', model_file.name)
+            with open(model_path, 'wb') as f:
+                for chunk in model_file.chunks():
+                    f.write(chunk)
+            
+            # Optionally retrain the model
+            if request.POST.get('retrain'):
+                train_model()
+            
+            messages.success(request, 'Model uploaded successfully!')
+            return redirect('admin_dashboard')
+        
+        except Exception as e:
+            messages.error(request, f'Error uploading model: {str(e)}')
+            return redirect('admin_dashboard')
+    
+
+    return render(request, 'dashboards/admin_dashboard.html')
+
+
+
+# Weather forecat api
+def get_weather_forecast(location):
+    if not weather_api:
+        logger.error("OpenWeatherMap API key is not set.")
+        return {'precipitation': 0.0}  # Fallback value
+
+    try:
+        # OpenWeatherMap API endpoint for 5-day forecast (3-hour intervals)
+        url = f"http://api.openweathermap.org/data/2.5/forecast?q={location}&appid={weather_api}&units=metric"
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()  # Raise an exception for bad status codes
+
+        data = response.json()
+        # Extract precipitation for the next 24 hours (first 8 intervals of 3 hours)
+        precipitation = 0.0
+        for forecast in data['list'][:8]:  # Next 24 hours (8 * 3-hour intervals)
+            precipitation += forecast.get('rain', {}).get('3h', 0.0)  # Rainfall in mm for 3 hours
+
+        return {'precipitation': precipitation}
+    
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to fetch weather forecast for {location}: {str(e)}")
+        return {'precipitation': 0.0}  # Fallback value
+
+
+# Making soil moisture predictions
+# views.py
+
+@login_required
+@role_required('admin')
+def predict_moisture(request):
+    if request.method == 'POST':
+        try:
+            location = request.POST.get('location')
+            current_moisture = float(request.POST.get('soil_moisture_percent'))
+            temperature = float(request.POST.get('temperature'))
+            humidity = float(request.POST.get('humidity'))
+            
+            weather_forecast = get_weather_forecast(location)
+            
+            # Make prediction
+            prediction = predict_soil_moisture(
+                location, current_moisture, temperature, humidity, weather_forecast
+            )
+            
+            # Store prediction in context
+            context = {
+                'prediction': round(prediction, 2),
+                'location': location,
+                'current_moisture': current_moisture,
+                'temperature': temperature,
+                'humidity': humidity,
+            }
+            return render(request, 'dashboards/prediction_result.html', context)
+        
+        except ValueError as e:
+            messages.error(request, f"Invalid input: {str(e)}")
+            return redirect('admin_dashboard')
+    
+    return render(request, 'dashboards/admin_dashboard.html')

@@ -133,17 +133,29 @@
             <div class="card">
                 <div class="card-body">
                     <h5>Filter Records</h5>
-                    <form class="row g-3">
+                    <form method="GET" action="{% url 'admin_dashboard' %}" class="row g-3">
                         <div class="col-md-3">
-                            <select class="form-select">
-                                <option>Location</option>
-                                <option value="field1">Field 1</option>
+                            <label for="location">Location</label>
+                            <select class="form-select" id="location" name="location">
+                                <option value="">All Locations</option>
+                                {% for location in locations %}
+                                <option value="{{ location }}" {% if location == selected_location %}selected{% endif %}>
+                                    {{ location }}</option>
+                                {% endfor %}
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <input type="date" class="form-control">
+                            <label for="start_date">Start Date</label>
+                            <input type="date" class="form-control" id="start_date" name="start_date"
+                                value="{{ start_date }}">
                         </div>
-                        <button type="submit" class="btn btn-primary col-md-2">Filter</button>
+                        <div class="col-md-3">
+                            <label for="end_date">End Date</label>
+                            <input type="date" class="form-control" name="end_date" value="{{ end_date }}">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary">Filter</button>
+                        </div>
                     </form>
                     <table class="table table-striped mt-3">
                         <thead>
@@ -151,21 +163,26 @@
                                 <th>Timestamp</th>
                                 <th>Location</th>
                                 <th>Moisture</th>
-                                <th>Source</th>
+                                <th>Status</th>
                             </tr>
                         </thead>
                         <tbody>
+                            {% for record in records %}
                             <tr>
-                                <td>2025-10-01 10:00</td>
-                                <td>Field 1</td>
-                                <td>45%</td>
-                                <td>IoT</td>
+                                <td>{{ record.timestamp|date:"Y-m-d H:i" }}</td>
+                                <td>{{ record.location }}</td>
+                                <td>{{ record.soil_moisture_percent }}%</td>
+                                <td>{{ record.status }}</td>
                             </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4">No records found.</td>
+                            </tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
-
         </section>
 
         <!-- ML Models Section -->
@@ -174,15 +191,22 @@
             <div class="card">
                 <div class="card-body">
                     <h5>Upload Model</h5>
-                    <form>
+                    <form method="POST" enctype="multipart/form-data" action="{% url 'upload_model' %}">
+                        {% csrf_token %}
                         <div class="mb-3">
-                            <input type="file" class="form-control" id="ml-model-upload">
+                            <input type="file" class="form-control" id="ml-model-upload" name="ml-model-upload"
+                                accept=".pkl,.h5">
+                        </div>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" id="retrain" name="retrain">
+                            <label class="form-check-label" for="retrain">Retrain model with latest data</label>
                         </div>
                         <button type="submit" class="btn btn-primary">Upload & Retrain</button>
                     </form>
                     <h5>Model Performance</h5>
                     <p>Accuracy: 85% | RMSE: 0.03</p>
                 </div>
+            </div>
         </section>
 
         <!-- Predictions Section -->
@@ -191,19 +215,34 @@
             <div class="card">
                 <div class="card-body">
                     <h5>Prediction Input</h5>
-                    <form>
+                    <form method="POST" action="{% url 'predict_moisture' %}">
+                        {% csrf_token %}
                         <div class="row g-3">
                             <div class="col-md-3">
-                                <input type="text" class="form-control" placeholder="Location">
+                                <input type="text" class="form-control" name="location" placeholder="Location" required>
                             </div>
                             <div class="col-md-3">
-                                <input type="number" class="form-control" placeholder="Moisture (%)">
+                                <input type="number" step="0.1" class="form-control" name="soil_moisture_percent"
+                                    placeholder="Moisture (%)" required>
                             </div>
-                            <button type="submit" class="btn btn-primary col-md-2">Predict</button>
+                            <div class="col-md-3">
+                                <input type="number" step="0.1" class="form-control" name="temperature"
+                                    placeholder="Temperature (°C)" required>
+                            </div>
+                            <div class="col-md-3">
+                                <input type="number" step="0.1" class="form-control" name="humidity"
+                                    placeholder="Humidity (%)" required>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-primary">Predict</button>
+                            </div>
                         </div>
                     </form>
+                    {% if prediction %}
                     <h5>Prediction Results</h5>
-                    <p>Predicted Moisture: 47% (Next 24h)</p>
+                    <p>Predicted Moisture: {{ prediction }}% (Next 24h)</p>
+                    <canvas id="predictionChart"></canvas>
+                    {% endif %}
                 </div>
             </div>
         </section>

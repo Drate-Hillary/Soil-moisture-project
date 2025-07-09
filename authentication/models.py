@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.contrib.auth.models import User
 
 class CustomUser(AbstractUser):
     ROLE_CHOICES = (
@@ -32,3 +33,16 @@ class SoilMoistureRecord(models.Model):
 
     class Meta:
         db_table = 'soil_moisture_records'
+
+
+
+class SoilMoisturePrediction(models.Model):
+    timestamp = models.DateTimeField(auto_now_add=True)
+    location = models.CharField(max_length=100)
+    predicted_moisture = models.FloatField()
+    input_moisture = models.FloatField()
+    input_temperature = models.FloatField()
+    input_humidity = models.FloatField()
+
+    def __str__(self):
+        return f"{self.location} - {self.predicted_moisture}%"

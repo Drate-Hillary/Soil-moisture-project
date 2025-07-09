@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import upload_csv  
+from .views import upload_csv, predict_moisture, upload_model  
 
 urlpatterns = [
     path('', views.home, name='home'),
@@ -12,4 +12,6 @@ urlpatterns = [
     path('technician_dashboard/', views.technician_dashboard, name='technician_dashboard'),
     path('profile/', views.profile, name='profile'),
     path('upload_csv/', upload_csv, name='upload_csv'),
+    path('predict_moisture/', predict_moisture, name='predict_moisture'),
+    path('upload_model/', upload_model, name='upload_model'),
 ]
