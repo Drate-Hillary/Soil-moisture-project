@@ -1,0 +1,8 @@
+{
+    "rmse": 3.896,
+    "r2_score": 93.68,
+    "mae": 3.286,
+    "training_samples": 300,
+    "test_samples": 76,
+    "total_samples": 376
+}

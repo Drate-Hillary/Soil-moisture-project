@@ -1,6 +1,6 @@
+# models.py
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-from django.contrib.auth.models import User
 
 class CustomUser(AbstractUser):
     ROLE_CHOICES = (
@@ -12,10 +12,18 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.email
-    
 
+class TechnicianLocationAssignment(models.Model):
+    technician = models.ForeignKey(CustomUser, on_delete=models.CASCADE, limit_choices_to={'role': 'technician'})
+    location = models.CharField(max_length=100)
 
-# uploading a csv file into the database
+    class Meta:
+        db_table = 'technician_location_assignments'
+        unique_together = ('technician', 'location')  # Ensure a technician can't be assigned to the same location twice
+
+    def __str__(self):
+        return f"{self.technician.get_full_name() or self.technician.username} - {self.location}"
+
 class SoilMoistureRecord(models.Model):
     record_id = models.IntegerField(unique=True)
     sensor_id = models.CharField(max_length=50)
@@ -34,15 +42,15 @@ class SoilMoistureRecord(models.Model):
     class Meta:
         db_table = 'soil_moisture_records'
 
-
-
 class SoilMoisturePrediction(models.Model):
-    timestamp = models.DateTimeField(auto_now_add=True)
     location = models.CharField(max_length=100)
     predicted_moisture = models.FloatField()
-    input_moisture = models.FloatField()
-    input_temperature = models.FloatField()
-    input_humidity = models.FloatField()
-
+    current_moisture = models.FloatField()
+    temperature = models.FloatField()
+    humidity = models.FloatField()
+    precipitation = models.FloatField()
+    prediction_for = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    
     def __str__(self):
         return f"{self.location} - {self.predicted_moisture}%"

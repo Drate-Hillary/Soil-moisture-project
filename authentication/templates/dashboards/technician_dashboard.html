@@ -1,13 +1,15 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Technician Dashboard - Soil Moisture System</title>
-    {% load static %}
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Chart.js for visualizations -->
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{% static 'css/tech.css' %}">
@@ -26,22 +28,16 @@
                 <a class="nav-link" href="#data-ingestion">Data Ingestion</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="#database">Database Status</a>
-            </li>
-            <li class="nav-item">
                 <a class="nav-link" href="#records">Soil Moisture Records</a>
             </li>
             <li class="nav-item">
                 <a class="nav-link" href="#predictions">Predictions</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="#notifications">Notifications</a>
-            </li>
-            <li class="nav-item">
                 <a class="nav-link" href="#reports">Reports</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="#logout">Logout</a>
+                <a class="nav-link" href="{% url 'logout' %}">Logout</a>
             </li>
         </ul>
     </div>
@@ -51,10 +47,23 @@
         <!-- Header -->
         <header class="dashboard-header">
             <button class="btn btn-primary d-lg-none" id="sidebarToggle">☰</button>
-            <h2>Soil Moisture Monitoring System</h2>
+            <h2>Soil Moisture</h2>
+            <p>Welcome, {{ user.email }} | Location: {{ selected_location|default:"No location selected" }}</p>
         </header>
 
-        <!-- Dashboard Section -->
+        <!-- Messages -->
+        {% if messages %}
+            <div class="container mt-3">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <!-- Real-Time Dashboard -->
         <section id="dashboard" class="content-section">
             <h3>Real-Time Dashboard</h3>
             <div class="row">
@@ -62,7 +71,7 @@
                     <div class="card">
                         <div class="card-body">
                             <h5>Active Sensors</h5>
-                            <p>45/50</p>
+                            <p>{{ active_sensors|default:"N/A" }} / {{ total_sensors|default:"N/A" }}</p>
                         </div>
                     </div>
                 </div>
@@ -70,14 +79,22 @@
                     <div class="card">
                         <div class="card-body">
                             <h5>Average Moisture</h5>
-                            <p>42.5%</p>
+                            <p>{{ average_moisture|default:"N/A" }}%</p>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-12">
+                <div class="col-md-4">
                     <div class="card">
                         <div class="card-body">
-                            <h5>Moisture Trends</h5>
+                            <h5>Average Temperature</h5>
+                            <p>{{ average_temperature|default:"N/A" }}°C</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-12 mt-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5>Moisture Trends ({{ selected_location|default:"All Locations" }})</h5>
                             <canvas id="moistureChart"></canvas>
                         </div>
                     </div>
@@ -90,45 +107,74 @@
             <h3>Data Ingestion Monitoring</h3>
             <div class="card">
                 <div class="card-body">
-                    <h5>Real-Time Data Stream</h5>
-                    <ul class="list-group">
-                        <li class="list-group-item">Sensor 1: 45% (2025-07-08 10:50) <button class="btn btn-sm btn-warning float-end">Flag</button></li>
-                        <li class="list-group-item">Sensor 2: 40% (2025-07-08 10:49) <button class="btn btn-sm btn-warning float-end">Flag</button></li>
-                    </ul>
-                    <h5>Upload Logs</h5>
-                    <p>Last CSV Upload: 2025-07-08 09:00 (100 records)</p>
+                    <h5>Storage Metrics</h5>
+                    <p>Records: {{ total_records|default:"N/A" }} | Last Update: {{ last_update|default:"N/A" }}</p>
                 </div>
             </div>
-        </section>
-
-        <!-- Database Status Section -->
-        <section id="database" class="content-section">
-            <h3>Database Status</h3>
             <div class="card">
                 <div class="card-body">
-                    <h5>Storage Metrics</h5>
-                    <p>Records: 10,234 | Last Update: 2025-07-08 10:50</p>
+                    <h5>Real-Time Data Stream</h5>
+                    <form method="GET" action="{% url 'technician_dashboard' %}" class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <label for="data_location" class="form-label">Location</label>
+                            <select class="form-select" id="data_location" name="location">
+                                <option value="">All Assigned Locations</option>
+                                {% for location in locations %}
+                                    <option value="{{ location }}" {% if location == selected_location %}selected{% endif %}>
+                                        {{ location }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary mt-4">Filter</button>
+                        </div>
+                    </form>
+                    <ul class="list-group">
+                        {% for record in recent_records %}
+                            <li class="list-group-item">
+                                Sensor {{ record.sensor_id|default:"N/A" }}: {{ record.soil_moisture_percent }}% ({{ record.timestamp|date:"Y-m-d H:i" }})
+                                <button class="btn btn-sm btn-warning float-end">Flag</button>
+                            </li>
+                        {% empty %}
+                            <li class="list-group-item">No recent data available.</li>
+                        {% endfor %}
+                    </ul>
+                    <h5>Upload Logs</h5>
+                    <p>Last CSV Upload: {{ last_upload|default:"N/A" }}</p>
                 </div>
             </div>
         </section>
 
-        <!-- Soil Moisture Records Section -->
+        <!-- Soil Moisture Records -->
         <section id="records" class="content-section">
             <h3>Soil Moisture Records</h3>
             <div class="card">
                 <div class="card-body">
                     <h5>Filter Records</h5>
-                    <form class="row g-3">
+                    <form method="GET" action="{% url 'technician_dashboard' %}" class="row g-3">
                         <div class="col-md-3">
-                            <select class="form-select" id="location-filter">
-                                <option>Location</option>
-                                <option value="field1">Field 1</option>
+                            <label for="location" class="form-label">Location</label>
+                            <select class="form-select" id="location" name="location">
+                                <option value="">All Assigned Locations</option>
+                                {% for location in locations %}
+                                    <option value="{{ location }}" {% if location == selected_location %}selected{% endif %}>
+                                        {{ location }}
+                                    </option>
+                                {% endfor %}
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <input type="date" class="form-control" id="date-filter">
+                            <label for="start_date" class="form-label">Start Date</label>
+                            <input type="date" class="form-control" id="start_date" name="start_date" value="{{ start_date }}">
                         </div>
-                        <button type="submit" class="btn btn-primary col-md-2">Filter</button>
+                        <div class="col-md-3">
+                            <label for="end_date" class="form-label">End Date</label>
+                            <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date }}">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary">Filter</button>
+                        </div>
                     </form>
                     <table class="table table-striped mt-3">
                         <thead>
@@ -136,78 +182,113 @@
                                 <th>Timestamp</th>
                                 <th>Location</th>
                                 <th>Moisture</th>
-                                <th>Source</th>
+                                <th>Status</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td>2025-07-08 10:50</td>
-                                <td>Field 1</td>
-                                <td>45%</td>
-                                <td>IoT</td>
-                            </tr>
+                            {% for record in records %}
+                                <tr>
+                                    <td>{{ record.timestamp|date:"Y-m-d H:i" }}</td>
+                                    <td>{{ record.location }}</td>
+                                    <td>{{ record.soil_moisture_percent }}%</td>
+                                    <td>{{ record.status }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="4">No records found.</td>
+                                </tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
         </section>
 
-        <!-- Predictions Section -->
+        <!-- Predictions -->
         <section id="predictions" class="content-section">
             <h3>Predictions</h3>
             <div class="card">
                 <div class="card-body">
-                    <h5>View Predictions</h5>
-                    <form class="row g-3">
+                    <h5>Make a Prediction</h5>
+                    <form method="POST" action="{% url 'technician_predict_moisture' %}" class="row g-3">
+                        {% csrf_token %}
                         <div class="col-md-3">
-                            <input type="text" class="form-control" id="location" placeholder="Location">
+                            <label for="location" class="form-label">Location</label>
+                            <select class="form-select" id="location" name="location" required>
+                                <option value="">Select Location</option>
+                                {% for location in locations %}
+                                    <option value="{{ location }}" {% if location == selected_location %}selected{% endif %}>
+                                        {{ location }}
+                                    </option>
+                                {% endfor %}
+                            </select>
                         </div>
                         <div class="col-md-3">
-                            <input type="number" class="form-control" id="moisture" placeholder="Moisture (%)">
+                            <label for="soil_moisture_percent" class="form-label">Current Moisture (%)</label>
+                            <input type="number" step="0.01" class="form-control" id="soil_moisture_percent" name="soil_moisture_percent" placeholder="Moisture (%)" required>
                         </div>
-                        <button type="submit" class="btn btn-primary col-md-2">View</button>
+                        <div class="col-md-3">
+                            <label for="temperature" class="form-label">Temperature (°C)</label>
+                            <input type="number" step="0.01" class="form-control" id="temperature" name="temperature" placeholder="Temperature (°C)" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="humidity" class="form-label">Humidity (%)</label>
+                            <input type="number" step="0.01" class="form-control" id="humidity" name="humidity" placeholder="Humidity (%)" required>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary">Predict</button>
+                        </div>
                     </form>
                     <h5>Prediction Results</h5>
-                    <p>Predicted Moisture: 47% (Next 24h)</p>
+                    {% if prediction %}
+                        <p><strong>Predicted Moisture (Next 24h):</strong> {{ prediction }}% for {{ location }}</p>
+                        <p><strong>Current Moisture:</strong> {{ current_moisture }}%</p>
+                        <p><strong>Temperature:</strong> {{ temperature }}°C</p>
+                        <p><strong>Humidity:</strong> {{ humidity }}%</p>
+                    {% else %}
+                        <p>No prediction available.</p>
+                    {% endif %}
                     <canvas id="predictionChart"></canvas>
                 </div>
             </div>
         </section>
 
-        <!-- Notifications Section -->
-        <section id="notifications" class="content-section">
-            <h3>Notifications</h3>
-            <div class="card">
-                <div class="card-body">
-                    <h5>Alerts</h5>
-                    <ul class="list-group">
-                        <li class="list-group-item">Low Moisture in Field 1 (30%) <button class="btn btn-sm btn-success float-end">Acknowledge</button></li>
-                        <li class="list-group-item">Sensor 3 Offline <button class="btn btn-sm btn-success float-end">Acknowledge</button></li>
-                    </ul>
-                </div>
-            </div>
-        </section>
-
-        <!-- Reports Section -->
+        <!-- Reports -->
         <section id="reports" class="content-section">
             <h3>Reports</h3>
             <div class="card">
                 <div class="card-body">
-                    <h5>Download Reports</h5>
-                    <form class="row g-3">
+                    <h5>Generate Report</h5>
+                    <form method="POST" action="{% url 'generate_report' %}" class="row g-3">
+                        {% csrf_token %}
                         <div class="col-md-3">
-                            <select class="form-select" id="report-type">
-                                <option>Sensor Performance</option>
-                                <option>Data Quality</option>
+                            <label for="report_type" class="form-label">Report Type</label>
+                            <select class="form-select" name="report_type" id="report_type">
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <select class="form-select" id="report-format">
-                                <option>PDF</option>
-                                <option>Excel</option>
+                            <label for="format_type" class="form-label">Format</label>
+                            <select class="form-select" name="format_type" id="format_type">
+                                <option value="pdf">PDF</option>
+                                <option value="excel">Excel</option>
                             </select>
                         </div>
-                        <button type="submit" class="btn btn-primary col-md-2">Download</button>
+                        <div class="col-md-3">
+                            <label for="start_date" class="form-label">Start Date</label>
+                            <input type="date" class="form-control" name="start_date" id="start_date">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="end_date" class="form-label">End Date</label>
+                            <input type="date" class="form-control" name="end_date" id="end_date">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-download"></i> Download
+                            </button>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -217,5 +298,8 @@
     <!-- Bootstrap JS and Custom JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{% static 'JS/technician_scripts.js' %}"></script>
+    <script id="chartData" type="application/json">
+        {{ chart_data|safe }}
+    </script>
 </body>
 </html>

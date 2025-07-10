@@ -1,51 +1,212 @@
-// Sidebar Toggle for Mobile
-document.getElementById('sidebarToggle').addEventListener('click', function() {
-    document.querySelector('.sidebar').classList.toggle('active');
-});
+// soil_moisture_app/static/js/admin_scripts.js
+document.addEventListener('DOMContentLoaded', function() {
+    // Sidebar Toggle for Mobile
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', function() {
+            document.querySelector('.sidebar').classList.toggle('active');
+        });
+    }
 
-// Sample Chart.js for Moisture Trends
-const moistureCtx = document.getElementById('moistureChart').getContext('2d');
-new Chart(moistureCtx, {
-    type: 'line',
-    data: {
-        labels: ['2025-07-08 08:00', '2025-07-08 09:00', '2025-07-08 10:00'],
-        datasets: [{
-            label: 'Soil Moisture (%)',
-            data: [40, 42, 45],
-            borderColor: '#3498db',
-            fill: false
-        }]
-    },
-    options: {
-        responsive: true,
-        scales: {
-            y: {
-                beginAtZero: true,
-                max: 100
+    // Chart.js for Moisture Trends
+    const moistureCtx = document.getElementById('moistureChart');
+    if (moistureCtx) {
+        // Get chart data from Django template variable
+        const chartDataElement = document.getElementById('chartData');
+        let chartData = null;
+        
+        if (chartDataElement) {
+            try {
+                chartData = JSON.parse(chartDataElement.textContent);
+            } catch (e) {
+                console.error('Error parsing chart data:', e);
             }
+        }
+
+        if (chartData && chartData.labels && chartData.data) {
+            new Chart(moistureCtx.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [{
+                        label: 'Average Soil Moisture (%)',
+                        data: chartData.data,
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#3498db',
+                        pointBorderColor: '#ffffff',
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Daily Average Soil Moisture Trends'
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            },
+                            grid: {
+                                display: true,
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Moisture (%)'
+                            },
+                            grid: {
+                                display: true,
+                                color: 'rgba(0,0,0,0.1)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    hover: {
+                        animationDuration: 200
+                    }
+                }
+            });
+        } else {
+            // Display message when no data is available
+            const canvas = moistureCtx;
+            const ctx = canvas.getContext('2d');
+            ctx.font = '16px Arial';
+            ctx.fillStyle = '#666';
+            ctx.textAlign = 'center';
+            ctx.fillText('No data available for chart', canvas.width / 2, canvas.height / 2);
         }
     }
-});
 
-// Sample Chart.js for Predictions
-const predictionCtx = document.getElementById('predictionChart').getContext('2d');
-new Chart(predictionCtx, {
-    type: 'bar',
-    data: {
-        labels: ['Actual', 'Predicted'],
-        datasets: [{
-            label: 'Moisture (%)',
-            data: [45, 47],
-            backgroundColor: ['#3498db', '#e74c3c']
-        }]
-    },
-    options: {
-        responsive: true,
-        scales: {
-            y: {
-                beginAtZero: true,
-                max: 100
+    // Chart.js for Prediction Chart
+    const predictionCtx = document.getElementById('predictionChart');
+    if (predictionCtx) {
+        const predictionDataElement = document.getElementById('predictionData');
+        let predictions = null;
+        
+        if (predictionDataElement) {
+            try {
+                predictions = JSON.parse(predictionDataElement.textContent);
+            } catch (e) {
+                console.error('Error parsing prediction data:', e);
             }
         }
+
+        if (predictions && predictions.length > 0) {
+            new Chart(predictionCtx.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: predictions.map(p => new Date(p.timestamp).toLocaleString()),
+                    datasets: [{
+                        label: 'Predicted Moisture (%)',
+                        data: predictions.map(p => p.predicted_moisture),
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 4
+                    }, {
+                        label: 'Input Moisture (%)',
+                        data: predictions.map(p => p.input_moisture),
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Moisture Predictions vs Input Values'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Timestamp'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Moisture (%)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    // Handle section navigation
+    const navLinks = document.querySelectorAll('.nav-link');
+    const sections = document.querySelectorAll('.content-section');
+
+    navLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('href').substring(1);
+            
+            // Hide all sections
+            sections.forEach(section => {
+                section.style.display = 'none';
+            });
+            
+            // Show target section
+            const targetSection = document.getElementById(targetId);
+            if (targetSection) {
+                targetSection.style.display = 'block';
+            }
+            
+            // Update active nav link
+            navLinks.forEach(navLink => {
+                navLink.classList.remove('active');
+            });
+            this.classList.add('active');
+        });
+    });
+
+    // Show dashboard section by default
+    const dashboardSection = document.getElementById('dashboard');
+    if (dashboardSection) {
+        dashboardSection.style.display = 'block';
     }
 });

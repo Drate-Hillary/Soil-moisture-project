@@ -9,6 +9,7 @@
     {% load static %}
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <!-- Chart.js for visualizations -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Custom CSS -->
@@ -16,6 +17,14 @@
 </head>
 
 <body>
+    <script id="chartData" type="application/json">{{ chart_data|safe }}</script>
+    <script id="predictionData" type="application/json">
+        {% if predictions %}
+            {{ predictions|safe }}
+        {% else %}
+            []
+        {% endif %}
+    </script>
     <!-- Sidebar Navigation -->
     <div class="sidebar">
         <div class="sidebar-header">
@@ -39,6 +48,9 @@
             </li>
             <li class="nav-item">
                 <a class="nav-link" href="#predictions">Predictions</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#technicians">Technician Management</a>
             </li>
             <li class="nav-item">
                 <a class="nav-link" href="#notifications">Notifications</a>
@@ -67,15 +79,78 @@
                 <div class="col-md-4">
                     <div class="card">
                         <div class="card-body">
-                            <h5>Average Moisture</h5>
-                            <p>42.5%</p>
+                            <h5>Average Soil Moisture</h5>
+                            <p>
+                                {% if average_moisture is not None %}
+                                {{ average_moisture }}%
+                                {% else %}
+                                No data available
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5>Average Temperature</h5>
+                            <p>
+                                {% if average_temperature is not None %}
+                                {{ average_temperature }}°C
+                                {% else %}
+                                No data available
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5>Average Humidity</h5>
+                            <p>
+                                {% if average_humidity is not None %}
+                                {{ average_humidity }}%
+                                {% else %}
+                                No data available
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5>Today's Weather in {{ weather_location }}</h5>
+                            {% if current_weather %}
+                            <div class="weather-info">
+                                <div class="d-flex align-items-center">
+                                    {% if current_weather.icon %}
+                                    <img src="http://openweathermap.org/img/wn/{{ current_weather.icon }}@2x.png"
+                                        alt="{{ current_weather.description }}" class="weather-icon">
+                                    {% endif %}
+                                    <span class="temperature">{{ current_weather.temperature|floatformat:1 }}°C</span>
+                                </div>
+                                <p class="weather-desc">{{ current_weather.description|title }}</p>
+                                <div class="weather-details">
+                                    <p><i class="bi bi-droplet"></i> Humidity: {{ current_weather.humidity }}%</p>
+                                    <p><i class="bi bi-wind"></i> Wind: {{ current_weather.wind_speed }} m/s</p>
+                                    {% if current_weather.rain > 0 %}
+                                    <p><i class="bi bi-cloud-rain"></i> Rain: {{ current_weather.rain }} mm</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% else %}
+                            <p>Weather data not available</p>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
                 <div class="col-md-12">
                     <div class="card">
                         <div class="card-body">
-                            <h5>Moisture Trends</h5>
+                            <h5>Soil Moisture Trends</h5>
                             <canvas id="moistureChart"></canvas>
                         </div>
                     </div>
@@ -139,7 +214,7 @@
                             <select class="form-select" id="location" name="location">
                                 <option value="">All Locations</option>
                                 {% for location in locations %}
-                                <option value="{{ location }}" {% if location == selected_location %}selected{% endif %}>
+                                <option value="{{ location }}" {% if location == 'selected_location' %}selected{% endif%}>
                                     {{ location }}</option>
                                 {% endfor %}
                             </select>
@@ -154,7 +229,10 @@
                             <input type="date" class="form-control" name="end_date" value="{{ end_date }}">
                         </div>
                         <div class="col-md-2">
-                            <button type="submit" class="btn btn-primary">Filter</button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-search"></i>
+                                Filter
+                            </button>
                         </div>
                     </form>
                     <table class="table table-striped mt-3">
@@ -195,7 +273,7 @@
                         {% csrf_token %}
                         <div class="mb-3">
                             <input type="file" class="form-control" id="ml-model-upload" name="ml-model-upload"
-                                accept=".pkl,.h5">
+                                accept=".pkl, .h5">
                         </div>
                         <div class="form-check mb-3">
                             <input type="checkbox" class="form-check-input" id="retrain" name="retrain">
@@ -204,7 +282,11 @@
                         <button type="submit" class="btn btn-primary">Upload & Retrain</button>
                     </form>
                     <h5>Model Performance</h5>
-                    <p>Accuracy: 85% | RMSE: 0.03</p>
+                    {% if model_metrics.rmse and model_metrics.r2_score %}
+                    <p>Accuracy: {{ model_metrics.r2_score }}% | RMSE: {{ model_metrics.rmse }}</p>
+                    {% else %}
+                    <p>No model performance metrics available.</p>
+                    {% endif %}
                 </div>
             </div>
         </section>
@@ -247,6 +329,163 @@
             </div>
         </section>
 
+        <!-- Technician Management -->
+        <section id="technicians" class="content-section">
+            <h3>Technician Management</h3>
+            <div class="row">
+                <!-- Technician List -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5>Technician List</h5>
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Email</th>
+                                            <th>Assigned Locations</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for technician in technicians %}
+                                        <tr>
+                                            <td>{{ technician.get_full_name|default:technician.username }}</td>
+                                            <td>{{ technician.email }}</td>
+                                            <td>
+                                                {% for assignment in technician.technicianlocationassignment_set.all %}
+                                                <span class="badge bg-primary">{{ assignment.location }}</span>
+                                                {% empty %}
+                                                <span class="text-muted">None</span>
+                                                {% endfor %}
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="3" class="text-center">No technicians found</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Assign Technician to Location -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5>Assign Technician to Location</h5>
+                            <form method="POST" action="{% url 'assign_technician' %}">
+                                {% csrf_token %}
+                                <div class="mb-3">
+                                    <label for="technician" class="form-label">Select Technician</label>
+                                    <select class="form-select" id="technician" name="technician_id" required>
+                                        <option value="" selected disabled>Choose technician...</option>
+                                        {% for technician in technicians %}
+                                        <option value="{{ technician.id }}">
+                                            {{ technician.get_full_name|default:technician.username }} ({{ technician.email }})
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="location" class="form-label">Select Location</label>
+                                    <select class="form-select" id="location" name="location" required>
+                                        <option value="" selected disabled>Choose location...</option>
+                                        {% for location in locations %}
+                                        <option value="{{ location }}">{{ location }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Assign Technician</button>
+                            </form>
+
+                            <!-- Unassign Technician Form -->
+                            <hr>
+                            <h5>Unassign Technician</h5>
+                            <form method="POST" action="{% url 'unassign_technician' %}" id="unassign-technician-form">
+                                {% csrf_token %}
+                                <div class="mb-3">
+                                    <label for="unassign-technician" class="form-label">Select Technician</label>
+                                    <select class="form-select" id="unassign-technician" name="technician_id" required>
+                                        <option value="" selected disabled>Choose technician...</option>
+                                        {% for technician in technicians %}
+                                        <option value="{{ technician.id }}">
+                                            {{ technician.get_full_name|default:technician.username }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="unassign-location" class="form-label">Select Location</label>
+                                    <select class="form-select" id="unassign-location" name="location" required>
+                                        <option value="" selected disabled>Choose location...</option>
+                                        {% for location in locations %}
+                                        <option value="{{ location }}">{{ location }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <button type="button" class="btn btn-warning" data-bs-toggle="modal"
+                                    data-bs-target="#unassignConfirmModal">
+                                    Unassign Technician
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add New Technician -->
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h5>Add New Technician</h5>
+                    <form method="POST" action="{% url 'add_technician' %}">
+                        {% csrf_token %}
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <input type="text" class="form-control" name="first_name" placeholder="First Name"
+                                    required>
+                            </div>
+                            <div class="col-md-4">
+                                <input type="text" class="form-control" name="last_name" placeholder="Last Name"
+                                    required>
+                            </div>
+                            <div class="col-md-4">
+                                <input type="email" class="form-control" name="email" placeholder="Email" required>
+                            </div>
+                            <div class="col-md-12">
+                                <button type="submit" class="btn btn-success">Add Technician</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Confirmation Modal -->
+            <div class="modal fade" id="unassignConfirmModal" tabindex="-1" aria-labelledby="unassignConfirmModalLabel"
+                aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="unassignConfirmModalLabel">Confirm Unassignment</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            Unassigning this technician will delete all soil moisture records for the selected location
+                            if no other technicians are assigned. Are you sure you want to proceed?
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-danger"
+                                onclick="document.getElementById('unassign-technician-form').submit();">Unassign</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Notifications Section -->
         <section id="notifications" class="content-section">
             <h3>Notifications</h3>
@@ -272,29 +511,44 @@
             <div class="card">
                 <div class="card-body">
                     <h5>Generate Report</h5>
-                    <form class="row g-3">
+                    <form method="POST" action="{% url 'generate_report' %}" class="row g-3">
+                        {% csrf_token %}
                         <div class="col-md-3">
-                            <select class="form-select">
-                                <option>Daily</option>
-                                <option>Weekly</option>
+                            <label for="report_type" class="form-label">Report Type</label>
+                            <select class="form-select" name="report_type" id="report_type">
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <select class="form-select">
-                                <option>PDF</option>
-                                <option>Excel</option>
+                            <label for="format_type" class="form-label">Format</label>
+                            <select class="form-select" name="format_type" id="format_type">
+                                <option value="pdf">PDF</option>
+                                <option value="excel">Excel</option>
                             </select>
                         </div>
-                        <button type="submit" class="btn btn-primary col-md-2">Download</button>
+                        <div class="col-md-3">
+                            <label for="start_date" class="form-label">Start Date</label>
+                            <input type="date" class="form-control" name="start_date" id="start_date">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="end_date" class="form-label">End Date</label>
+                            <input type="date" class="form-control" name="end_date" id="end_date">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-download"></i>
+                                Download
+                            </button>
+                        </div>
                     </form>
                 </div>
             </div>
         </section>
-    </div>
-
-    <!-- Bootstrap JS and Custom JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{% static 'JS/admin_scripts.js' %}"></script>
+        <!-- Bootstrap JS and Custom JS -->
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="{% static 'JS/admin_scripts.js' %}"></script>
 </body>
 
 </html>
