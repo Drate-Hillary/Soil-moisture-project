@@ -11,7 +11,7 @@ import io
 from django.contrib import messages
 from .models import SoilMoistureRecord, SoilMoisturePrediction
 from datetime import datetime
-from .ml_model import predict_soil_moisture, train_model, get_model_metrics
+from .ml_model import predict_soil_status, train_model, get_model_metrics, get_irrigation_schedule_recommendation
 import os
 import requests
 from .ml_model import train_model
@@ -36,6 +36,7 @@ from urllib.parse import urlencode
 from django.urls import reverse
 from django.http import HttpResponseRedirect
 
+from .models import SoilMoistureRecord
 
 
 
@@ -204,9 +205,122 @@ def admin_dashboard(request):
     }
     return render(request, 'dashboards/admin_dashboard.html', context)
 
+
 @role_required('farmer')
 def farmer_dashboard(request):
-    return render(request, 'dashboards/farmer_dashboard.html', {'user': request.user})
+    if request.method == 'POST':
+        try:
+            # Extract form data
+            soil_moisture = float(request.POST.get('soil-moisture'))
+            temperature = float(request.POST.get('temperature'))
+            humidity = float(request.POST.get('humidity'))
+
+            # Get unique locations for the dropdown
+            locations = SoilMoistureRecord.objects.values_list('location', flat=True).distinct()
+
+            # Query soil moisture records
+            records = SoilMoistureRecord.objects.all().order_by('-timestamp')
+
+            # Apply filters (corrected: filter by a single location, not multiple)
+            location = request.POST.get('location', '')  # Get location from POST if available
+            if location:
+                records = records.filter(location=location)
+
+            # Calculate daily averages for moisture trends chart
+            daily_averages = (
+                records.annotate(date=TruncDay('timestamp'))
+                .values('date')
+                .annotate(avg_moisture=Avg('soil_moisture_percent'))
+                .order_by('date')
+            )
+    
+            chart_data = {
+                'labels': [record['date'].strftime('%Y-%m-%d') for record in daily_averages],
+                'data': [round(record['avg_moisture'], 2) for record in daily_averages],
+            }
+
+            # Make prediction using the ML model
+            prediction_result = predict_soil_status(
+                soil_moisture=soil_moisture,
+                temperature=temperature,
+                humidity=humidity
+            )
+
+            # Get irrigation schedule recommendation
+            irrigation_schedule = get_irrigation_schedule_recommendation(
+                soil_status=prediction_result['status']
+            )
+
+            # Store prediction in the database
+            SoilMoisturePrediction.objects.create(
+                location='default',  # Use a default location since location is removed
+                predicted_moisture=soil_moisture,
+                current_moisture=soil_moisture,
+                temperature=temperature,
+                humidity=humidity,
+                precipitation=0,  # Set precipitation to 0 since weather API is removed
+                prediction_for=datetime.now() + timedelta(hours=24),
+                status=prediction_result['status']
+            )
+
+            # Prepare context for rendering results
+            context = {
+                'user': request.user,
+                'prediction': {
+                    'status': prediction_result['status'],
+                    'irrigation_recommendation': prediction_result['irrigation_recommendation'],
+                    'confidence': prediction_result['confidence'],
+                    'method': prediction_result['method'],
+                    'input_values': prediction_result['input_values'],
+                    'schedule': irrigation_schedule
+                },
+                'locations': locations,
+                'selected_location': location,
+                'chart_data': json.dumps(chart_data),
+            }
+
+            return render(request, 'dashboards/farmer_dashboard.html', context)
+
+        except ValueError as e:
+            messages.error(request, f"Invalid input: {str(e)}")
+            logger.error(f"Input validation error for farmer {request.user.email}: {str(e)}")
+            return redirect('farmer_dashboard')
+        except Exception as e:
+            messages.error(request, f"Error processing prediction: {str(e)}")
+            logger.error(f"Prediction error for farmer {request.user.email}: {str(e)}")
+            return redirect('farmer_dashboard')
+
+    # GET request: Render dashboard with locations
+    locations = SoilMoistureRecord.objects.values_list('location', flat=True).distinct()
+    # Set default location - use first location if available, otherwise a hardcoded default
+    default_location = locations[0] if locations else "Nairobi"
+    
+    # Get weather data
+    current_weather = None
+    if default_location:
+        current_weather = get_weather_forecast(default_location)
+    records = SoilMoistureRecord.objects.all().order_by('-timestamp')
+    if default_location:
+        records = records.filter(location=default_location)
+    daily_averages = (
+        records.annotate(date=TruncDay('timestamp'))
+        .values('date')
+        .annotate(avg_moisture=Avg('soil_moisture_percent'))
+        .order_by('date')
+    )
+    chart_data = {
+        'labels': [record['date'].strftime('%Y-%m-%d') for record in daily_averages],
+        'data': [round(record['avg_moisture'], 2) for record in daily_averages],
+    }
+    context = {
+        'user': request.user,
+        'locations': locations,
+        'selected_location': default_location,
+        'chart_data': json.dumps(chart_data),
+        'current_weather': current_weather,
+        'weather_location': default_location,
+    }
+    return render(request, 'dashboards/farmer_dashboard.html', context)
 
 
 @login_required
@@ -624,20 +738,30 @@ def add_technician(request):
 
     return redirect('admin_dashboard')
 
+import urllib.request
 
 # Weather forecat api
-def get_weather_forecast(location):
+def get_weather_forecast(location="Kampala"):
     if not weather_api:
         logger.error("OpenWeatherMap API key is not set.")
         return None  # Return None if no API key
 
+    # Map field names to actual locations
+    kampala_fields = ['Farm A', 'Farm B', 'Farm C', 'Farm D']
+    if location in kampala_fields:
+        location = 'Kampala'
+
     try:
         # OpenWeatherMap API endpoint for current weather
         url = f"http://api.openweathermap.org/data/2.5/weather?q={location}&appid={weather_api}&units=metric"
-        response = requests.get(url, timeout=5)
-        response.raise_for_status()  # Raise an exception for bad status codes
-
-        data = response.json()
+        # Create request and get response
+        request = urllib.request.Request(url)
+        with urllib.request.urlopen(request, timeout=5) as response:
+            if response.getcode() == 200:
+                data = json.loads(response.read().decode('utf-8'))
+            else:
+                logger.error(f"API request failed with status code: {response.getcode()}")
+                return None
         
         # Extract relevant weather information
         weather_data = {
@@ -646,7 +770,7 @@ def get_weather_forecast(location):
             'description': data['weather'][0]['description'],
             'icon': data['weather'][0]['icon'],
             'wind_speed': data['wind']['speed'],
-            'rain': data.get('rain', {}).get('1h', 0)  # Rain volume for last hour (mm)
+            'precipitation': data.get('rain', {}).get('1h', 0)  # Rain volume for last hour (mm)
         }
         
         return weather_data
@@ -654,10 +778,6 @@ def get_weather_forecast(location):
     except requests.exceptions.RequestException as e:
         logger.error(f"Failed to fetch current weather for {location}: {str(e)}")
         return None
-
-
-# Making soil moisture predictions
-# views.py
 
 @login_required
 @role_required('admin')
@@ -672,22 +792,39 @@ def predict_moisture(request):
             weather_forecast = get_weather_forecast(location)
             
             # Make prediction
-            prediction = predict_soil_moisture(
-                location, current_moisture, temperature, humidity, weather_forecast
+            prediction_result = predict_soil_status(
+                soil_moisture=current_moisture,
+                temperature=temperature,
+                humidity=humidity,
+                location=location
+            )
+            
+            # Store prediction
+            SoilMoisturePrediction.objects.create(
+                location=location,
+                predicted_moisture=prediction_result['status'],  # Use status or derived value
+                current_moisture=current_moisture,
+                temperature=temperature,
+                humidity=humidity,
+                precipitation=weather_forecast.get('rain', {}).get('1h', 0) if weather_forecast else 0,
+                prediction_for=datetime.now() + timedelta(hours=24)
             )
             
             # Store prediction in context
             context = {
-                'prediction': round(prediction, 2),
+                'prediction': prediction_result['status'],
                 'location': location,
                 'current_moisture': current_moisture,
                 'temperature': temperature,
                 'humidity': humidity,
+                'confidence': prediction_result['confidence'],
+                'method': prediction_result['method'],
+                'irrigation_recommendation': prediction_result['irrigation_recommendation'],
+                'input_values': prediction_result['input_values']
             }
             return render(request, 'dashboards/prediction_result.html', context)
         
         except ValueError as e:
-            messages.error(request, f"Invalid input: {str(e)}")
             return redirect('admin_dashboard')
     
     return render(request, 'dashboards/admin_dashboard.html')
@@ -858,7 +995,7 @@ def predict_moisture(request):
             weather_forecast = get_weather_forecast(location)
             
             # Make prediction
-            prediction = predict_soil_moisture(
+            prediction = predict_soil_status(
                 location, current_moisture, temperature, humidity, weather_forecast
             )
             
@@ -916,7 +1053,7 @@ def technician_predict_moisture(request):
             else:
                 precipitation = weather_forecast.get('rain', {}).get('1h', 0)
             
-            prediction = predict_soil_moisture(
+            prediction = predict_soil_status(
                 location, current_moisture, temperature, humidity, weather_forecast
             )
             

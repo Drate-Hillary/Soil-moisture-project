@@ -38,9 +38,6 @@
                 <a class="nav-link" href="#data-ingestion">Data Ingestion</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="#database">Database Management</a>
-            </li>
-            <li class="nav-item">
                 <a class="nav-link" href="#records">Soil Moisture Records</a>
             </li>
             <li class="nav-item">
@@ -58,19 +55,19 @@
             <li class="nav-item">
                 <a class="nav-link" href="#reports">Reports</a>
             </li>
-            <li class="nav-item">
-                <a class="nav-link" href="#logout">Logout</a>
-            </li>
+        
         </ul>
     </div>
 
     <!-- Main Content -->
     <div class="main-content">
         <!-- Header -->
-        <header class="dashboard-header">
-            <button class="btn btn-primary d-lg-none" id="sidebarToggle">☰</button>
-            <h2>Soil Moisture Management System</h2>
-        </header>
+       <header class="dashboard-header d-flex justify-content-between align-items-center px-3 py-2">
+    <button class="btn btn-primary d-lg-none" id="sidebarToggle">☰</button>
+    <h2 class="m-0 flex-grow-1 text-center text-lg-start">Soil Moisture Management System</h2>
+    <a href="{% url 'logout' %}" class="btn btn-outline-danger ms-auto">Logout</a>
+</header>
+
 
         <!-- Dashboard Section -->
         <section id="dashboard" class="content-section">
@@ -163,14 +160,14 @@
             <h3>Data Ingestion</h3>
             <div class="card">
                 <div class="card-body">
-                    <h5>Configure IoT Devices</h5>
+                    <!-- <h5>Configure IoT Devices</h5>
                     <form>
                         <div class="mb-3">
                             <label for="iot-api" class="form-label">API Endpoint</label>
                             <input type="text" class="form-control" id="iot-api" placeholder="e.g., mqtt://broker.com">
                         </div>
                         <button type="submit" class="btn btn-primary">Save Config</button>
-                    </form>
+                    </form> -->
                     <h5>CSV Upload</h5>
                     <form method="POST" enctype="multipart/form-data" action="{% url 'upload_csv' %}">
                         {% csrf_token %}
@@ -190,7 +187,7 @@
             </div>
         </section>
 
-        <!-- Database Management Section -->
+        <!-- Database Management Section
         <section id="database" class="content-section">
             <h3>Database Management</h3>
             <div class="card">
@@ -200,9 +197,9 @@
                     <button class="btn btn-warning">Archive Data</button>
                 </div>
             </div>
-        </section>
+        </section> -->
 
-        <!-- Soil Moisture Records Section -->
+       <!-- Soil Moisture Records Section -->
         <section id="records" class="content-section">
             <h3>Soil Moisture Records</h3>
             <div class="card">
@@ -261,8 +258,7 @@
                     </table>
                 </div>
             </div>
-        </section>
-
+        </section>
         <!-- ML Models Section -->
         <section id="ml-models" class="content-section">
             <h3>ML Models</h3>
@@ -438,7 +434,7 @@
             </div>
 
             <!-- Add New Technician -->
-            <div class="card mt-4">
+            <!-- <div class="card mt-4">
                 <div class="card-body">
                     <h5>Add New Technician</h5>
                     <form method="POST" action="{% url 'add_technician' %}">
@@ -461,7 +457,7 @@
                         </div>
                     </form>
                 </div>
-            </div>
+            </div> -->
 
             <!-- Confirmation Modal -->
             <div class="modal fade" id="unassignConfirmModal" tabindex="-1" aria-labelledby="unassignConfirmModalLabel"

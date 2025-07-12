@@ -36,20 +36,18 @@
             <li class="nav-item">
                 <a class="nav-link" href="#reports">Reports</a>
             </li>
-            <li class="nav-item">
-                <a class="nav-link" href="{% url 'logout' %}">Logout</a>
-            </li>
         </ul>
     </div>
 
     <!-- Main Content -->
     <div class="main-content">
         <!-- Header -->
-        <header class="dashboard-header">
-            <button class="btn btn-primary d-lg-none" id="sidebarToggle">☰</button>
-            <h2>Soil Moisture</h2>
-            <p>Welcome, {{ user.email }} | Location: {{ selected_location|default:"No location selected" }}</p>
-        </header>
+     <header class="dashboard-header d-flex justify-content-between align-items-center px-3 py-2">
+    <button class="btn btn-primary d-lg-none" id="sidebarToggle">☰</button>
+    <h2 class="m-0">Soil Moisture</h2>
+    <p class="m-0">Welcome, {{ user.email }} | Location: {{ selected_location|default:"No location selected" }}</p>
+    <a href="{% url 'logout' %}" class="btn btn-outline-danger ms-auto">Logout</a>
+</header>
 
         <!-- Messages -->
         {% if messages %}

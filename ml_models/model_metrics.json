@@ -1,8 +1,92 @@
 {
-    "rmse": 3.896,
-    "r2_score": 93.68,
-    "mae": 3.286,
+    "accuracy": 93.33,
+    "precision": 94.07,
+    "recall": 93.33,
+    "f1_score": 93.25,
     "training_samples": 300,
-    "test_samples": 76,
-    "total_samples": 376
+    "test_samples": 75,
+    "total_samples": 375,
+    "selected_features_count": 25,
+    "class_distribution": {
+        "Critical Low": 31,
+        "Dry": 119,
+        "Normal": 174,
+        "Wet": 51
+    },
+    "confusion_matrix": [
+        [
+            6,
+            0,
+            0,
+            0
+        ],
+        [
+            1,
+            21,
+            2,
+            0
+        ],
+        [
+            0,
+            0,
+            35,
+            0
+        ],
+        [
+            0,
+            0,
+            2,
+            8
+        ]
+    ],
+    "selected_features": [
+        "soil_moisture_percent",
+        "temperature_celsius",
+        "humidity_percent",
+        "moisture_rolling_3",
+        "moisture_rolling_6",
+        "temp_rolling_3",
+        "humidity_rolling_3",
+        "humidity_rolling_6",
+        "moisture_change",
+        "moisture_change_2",
+        "temp_change_2",
+        "humidity_change",
+        "humidity_change_2",
+        "temp_humidity_interaction",
+        "moisture_temp_ratio",
+        "moisture_humidity_ratio",
+        "temp_humidity_ratio",
+        "moisture_squared",
+        "temp_squared",
+        "humidity_squared",
+        "dryness_index",
+        "moisture_deficit",
+        "heat_stress_index",
+        "humidity_stress_index",
+        "critical_low_risk"
+    ],
+    "model_type": "VotingClassifier (RF + GB + ET)",
+    "class_wise_performance": {
+        "Critical Low": {
+            "precision": 85.71,
+            "recall": 100.0,
+            "f1_score": 92.31
+        },
+        "Dry": {
+            "precision": 100.0,
+            "recall": 87.5,
+            "f1_score": 93.33
+        },
+        "Normal": {
+            "precision": 89.74,
+            "recall": 100.0,
+            "f1_score": 94.59
+        },
+        "Wet": {
+            "precision": 100.0,
+            "recall": 80.0,
+            "f1_score": 88.89
+        }
+    }
 }
