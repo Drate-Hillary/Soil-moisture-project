@@ -3,7 +3,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Sidebar Toggle for Mobile
     const sidebarToggle = document.getElementById('sidebarToggle');
     if (sidebarToggle) {
-        sidebarToggle.addEventListener('click', function() {
+        sidebarToggle.addEventListener('click', function(e) {
+            e.preventDefault()
             document.querySelector('.sidebar').classList.toggle('active');
         });
     }

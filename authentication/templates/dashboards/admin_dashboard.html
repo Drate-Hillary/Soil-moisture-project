@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Soil Moisture System</title>
+    <title>{% block title %}Admin Dashboard - Soil Moisture System {% endblock %}</title>
 
     {% load static %}
     <!-- Bootstrap CSS -->
@@ -55,18 +55,19 @@
             <li class="nav-item">
                 <a class="nav-link" href="#reports">Reports</a>
             </li>
-        
+
         </ul>
     </div>
 
     <!-- Main Content -->
+    {% block content %}
     <div class="main-content">
         <!-- Header -->
-       <header class="dashboard-header d-flex justify-content-between align-items-center px-3 py-2">
-    <button class="btn btn-primary d-lg-none" id="sidebarToggle">☰</button>
-    <h2 class="m-0 flex-grow-1 text-center text-lg-start">Soil Moisture Management System</h2>
-    <a href="{% url 'logout' %}" class="btn btn-outline-danger ms-auto">Logout</a>
-</header>
+        <header class="dashboard-header d-flex justify-content-between align-items-center px-3 py-2">
+            <button class="btn btn-primary d-lg-none" id="sidebarToggle">☰</button>
+            <h2 class="m-0 flex-grow-1 text-center text-lg-start">Soil Moisture Management System</h2>
+            <a href="{% url 'logout' %}" class="btn btn-outline-danger ms-auto">Logout</a>
+        </header>
 
 
         <!-- Dashboard Section -->
@@ -199,7 +200,7 @@
             </div>
         </section> -->
 
-       <!-- Soil Moisture Records Section -->
+        <!-- Soil Moisture Records Section -->
         <section id="records" class="content-section">
             <h3>Soil Moisture Records</h3>
             <div class="card">
@@ -211,7 +212,7 @@
                             <select class="form-select" id="location" name="location">
                                 <option value="">All Locations</option>
                                 {% for location in locations %}
-                                <option value="{{ location }}" {% if location == 'selected_location' %}selected{% endif%}>
+                                <option value="{{ location }}" {% if location == selected_location %}selected{% endif %}>
                                     {{ location }}</option>
                                 {% endfor %}
                             </select>
@@ -232,7 +233,7 @@
                             </button>
                         </div>
                     </form>
-                    <table class="table table-striped mt-3">
+                    <table class="table table-striped mt-3" id="records-table">
                         <thead>
                             <tr>
                                 <th>Timestamp</th>
@@ -256,9 +257,27 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                    {% if total_records > 10 and not show_all %}
+                    <div class="text-center mt-3">
+                        <a href="{% url 'admin_dashboard' %}?{% if selected_location %}location={{ selected_location }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}show_all=true"
+                            class="btn btn-outline" id="show-more-btn">
+                            <img src="{% static 'images/arrow-down.svg' %}" alt="">
+                            Show More
+                        </a>
+                    </div>
+                    {% endif %}
+                    {% if show_all %}
+                    <div class="text-center mt-3">
+                        <a href="{% url 'admin_dashboard' %}?{% if selected_location %}location={{ selected_location }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}show_all=false"
+                            class="btn btn-primary-secondary" id="show-less-btn">
+                            <img src="{% static 'images/arrow-up.svg' %}" alt="">
+                            Show Less
+                        </a>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
-        </section>
+        </section>
         <!-- ML Models Section -->
         <section id="ml-models" class="content-section">
             <h3>ML Models</h3>
@@ -381,7 +400,8 @@
                                         <option value="" selected disabled>Choose technician...</option>
                                         {% for technician in technicians %}
                                         <option value="{{ technician.id }}">
-                                            {{ technician.get_full_name|default:technician.username }} ({{ technician.email }})
+                                            {{ technician.get_full_name|default:technician.username }} ({{
+                                            technician.email }})
                                         </option>
                                         {% endfor %}
                                     </select>
@@ -542,6 +562,8 @@
                 </div>
             </div>
         </section>
+
+        {% endblock %}
         <!-- Bootstrap JS and Custom JS -->
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
         <script src="{% static 'JS/admin_scripts.js' %}"></script>

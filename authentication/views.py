@@ -123,6 +123,7 @@ def admin_dashboard(request):
     location = request.GET.get('location', '')
     start_date = request.GET.get('start_date', '')
     end_date = request.GET.get('end_date', '')
+    show_all = request.GET.get('show_all', 'false').lower() == 'true'
 
     # Query soil moisture records
     records = SoilMoistureRecord.objects.all().order_by('-timestamp')
@@ -185,10 +186,15 @@ def admin_dashboard(request):
 
     technicians = CustomUser.objects.filter(role='technician').select_related()
     farms = TechnicianLocationAssignment.objects.all()
+    
+    # Limit records to 10 unless show_all is true
+    displayed_records = records[:10] if not show_all else records
 
     context = {
         'user': request.user,
-        'records': records,
+        'records': displayed_records,
+        'total_records': records.count(),
+        'show_all': show_all,
         'locations': locations,
         'selected_location': location,
         'start_date': start_date,
@@ -358,6 +364,7 @@ def technician_dashboard(request):
     location = request.GET.get('location', '')
     start_date = request.GET.get('start_date', '')
     end_date = request.GET.get('end_date', '')
+    show_all = request.GET.get('show_all', 'false').lower() == 'true'
 
     # If no location is provided, default to the first assigned location
     if not location and assigned_locations:
@@ -437,9 +444,14 @@ def technician_dashboard(request):
         # Clear prediction data from session after using it
         del request.session['prediction_data']
 
+    # Limit records to 10 unless show_all is true
+    displayed_records = records[:10] if not show_all else records
+
     context = {
         'user': request.user,
-        'records': records,
+        'records': displayed_records,
+        'total_records': records.count(),
+        'show_all': show_all,
         'recent_records': recent_records,
         'locations': locations,
         'selected_location': location,

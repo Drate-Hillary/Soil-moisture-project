@@ -198,6 +198,24 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                    {% if total_records > 10 and not show_all %}
+                    <div class="text-center mt-3">
+                        <a href="{% url 'technician_dashboard' %}?{% if selected_location %}location={{ selected_location }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}show_all=true"
+                            class="btn btn-outline" id="show-more-btn">
+                            <img src="{% static 'images/arrow-down.svg' %}" alt="">
+                            Show More
+                        </a>
+                    </div>
+                    {% endif %}
+                    {% if show_all %}
+                    <div class="text-center mt-3">
+                        <a href="{% url 'technician_dashboard' %}?{% if selected_location %}location={{ selected_location }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}show_all=false"
+                            class="btn btn-primary-secondary" id="show-less-btn">
+                            <img src="{% static 'images/arrow-up.svg' %}" alt="">
+                            Show Less
+                        </a>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </section>
