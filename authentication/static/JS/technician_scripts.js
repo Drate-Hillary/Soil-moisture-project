@@ -104,77 +104,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Chart.js for Prediction Chart
-    const predictionCtx = document.getElementById('predictionChart');
-    if (predictionCtx) {
-        const predictionDataElement = document.getElementById('predictionData');
-        let predictions = null;
-        
-        if (predictionDataElement) {
-            try {
-                predictions = JSON.parse(predictionDataElement.textContent);
-            } catch (e) {
-                console.error('Error parsing prediction data:', e);
-            }
-        }
-
-        if (predictions && predictions.length > 0) {
-            new Chart(predictionCtx.getContext('2d'), {
-                type: 'line',
-                data: {
-                    labels: predictions.map(p => new Date(p.timestamp).toLocaleString()),
-                    datasets: [{
-                        label: 'Predicted Moisture (%)',
-                        data: predictions.map(p => p.predicted_moisture),
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        backgroundColor: 'rgba(75, 192, 192, 0.1)',
-                        borderWidth: 2,
-                        fill: false,
-                        tension: 0.4,
-                        pointRadius: 4
-                    }, {
-                        label: 'Input Moisture (%)',
-                        data: predictions.map(p => p.input_moisture),
-                        borderColor: 'rgba(255, 99, 132, 1)',
-                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                        borderWidth: 2,
-                        fill: false,
-                        tension: 0.4,
-                        pointRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: 'Moisture Predictions vs Input Values'
-                        }
-                    },
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Timestamp'
-                            }
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text: 'Moisture (%)'
-                            },
-                            ticks: {
-                                callback: function(value) {
-                                    return value + '%';
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-    }
 
     // Handle section navigation
     const navLinks = document.querySelectorAll('.nav-link');
@@ -208,5 +137,107 @@ document.addEventListener('DOMContentLoaded', function() {
     const dashboardSection = document.getElementById('dashboard');
     if (dashboardSection) {
         dashboardSection.style.display = 'block';
+    }
+});
+
+// Add this JavaScript to your Django template
+// Make sure Chart.js is loaded before this script
+
+document.addEventListener('DOMContentLoaded', function() {
+    let chart = null;
+
+    function createMoistureChart() {
+        const ctx = document.getElementById('soilMoistureChart').getContext('2d');
+        
+        // Destroy existing chart if it exists
+        if (chart) {
+            chart.destroy();
+        }
+        
+        // Get chart data from the Django template
+        const chartDataScript = document.getElementById('chartData');
+        if (!chartDataScript) {
+            console.log('No chart data available');
+            return;
+        }
+        
+        let chartData;
+        try {
+            chartData = JSON.parse(chartDataScript.textContent);
+        } catch (e) {
+            console.error('Error parsing chart data:', e);
+            return;
+        }
+        
+        // Create the chart with the data from Django
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: chartData.labels,
+                datasets: chartData.datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: '7-Day Soil Moisture Forecast'
+                    },
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Date'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Moisture & Humidity (%)'
+                        },
+                        min: 0,
+                        max: 100
+                    },
+                    y2: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Temperature (°C)'
+                        },
+                        grid: {
+                            drawOnChartArea: false,
+                        },
+                    }
+                },
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                }
+            }
+        });
+    }
+
+    // Initialize chart when page loads
+    createMoistureChart();
+
+    // Re-create chart when form is submitted (if needed)
+    const predictionForm = document.getElementById('predictionForm');
+    if (predictionForm) {
+        predictionForm.addEventListener('submit', function() {
+            // Chart will be recreated when the page reloads with new data
+            setTimeout(createMoistureChart, 100);
+        });
     }
 });

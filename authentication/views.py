@@ -555,7 +555,7 @@ def upload_csv(request):
 @role_required('admin')
 def upload_model(request):
     if request.method == 'POST':
-        model_file = request.FILES.get('ml-model-upload')
+        model_file = request.FILES.get('irrigation-ml-model-upload')
         if not model_file:
             messages.error(request, 'No file uploaded.')
             return redirect('admin_dashboard')
@@ -573,7 +573,45 @@ def upload_model(request):
                     f.write(chunk)
             
             # Optionally retrain the model
-            if request.POST.get('retrain'):
+            if request.POST.get('irrigation-retrain'):
+                _, metrics = train_model()  # Get metrics from retraining
+                messages.success(request, f'Model retrained successfully! R² Score: {metrics["r2_score"]}% | RMSE: {metrics["rmse"]}')
+            else:
+                messages.success(request, 'Model uploaded successfully!')
+            
+            return redirect('admin_dashboard')
+        
+        except Exception as e:
+            messages.error(request, f'Error uploading model: {str(e)}')
+            return redirect('admin_dashboard')
+    
+
+    return render(request, 'dashboards/admin_dashboard.html')
+
+# Upload a ml model
+@login_required
+@role_required('admin')
+def upload_model(request):
+    if request.method == 'POST':
+        model_file = request.FILES.get('soil-moisture-ml-model-upload')
+        if not model_file:
+            messages.error(request, 'No file uploaded.')
+            return redirect('admin_dashboard')
+        
+        if not model_file.name.endswith(('.pkl', '.h5')):
+            messages.error(request, 'Please upload a valid model file (.pkl or .h5).')
+            return redirect('admin_dashboard')
+        
+        try:
+            # Save the model file
+            model_path = os.path.join(settings.BASE_DIR, 'ml_models', model_file.name)
+            os.makedirs(os.path.dirname(model_path), exist_ok=True)
+            with open(model_path, 'wb') as f:
+                for chunk in model_file.chunks():
+                    f.write(chunk)
+            
+            # Optionally retrain the model
+            if request.POST.get('soil-moisture-retrain'):
                 _, metrics = train_model()  # Get metrics from retraining
                 messages.success(request, f'Model retrained successfully! R² Score: {metrics["r2_score"]}% | RMSE: {metrics["rmse"]}')
             else:
@@ -754,19 +792,18 @@ import urllib.request
 
 # Weather forecat api
 def get_weather_forecast(location="Kampala"):
+    """
+    Fetch weather forecast for Kampala using OpenWeatherMap API.
+    """
     if not weather_api:
         logger.error("OpenWeatherMap API key is not set.")
-        return None  # Return None if no API key
+        return None
 
-    # Map field names to actual locations
-    kampala_fields = ['Farm A', 'Farm B', 'Farm C', 'Farm D']
-    if location in kampala_fields:
-        location = 'Kampala'
+    city = "Kampala"  # Always use Kampala for weather forecast
 
     try:
         # OpenWeatherMap API endpoint for current weather
-        url = f"http://api.openweathermap.org/data/2.5/weather?q={location}&appid={weather_api}&units=metric"
-        # Create request and get response
+        url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={weather_api}&units=metric"
         request = urllib.request.Request(url)
         with urllib.request.urlopen(request, timeout=5) as response:
             if response.getcode() == 200:
@@ -774,7 +811,7 @@ def get_weather_forecast(location="Kampala"):
             else:
                 logger.error(f"API request failed with status code: {response.getcode()}")
                 return None
-        
+
         # Extract relevant weather information
         weather_data = {
             'temperature': data['main']['temp'],
@@ -787,8 +824,11 @@ def get_weather_forecast(location="Kampala"):
         
         return weather_data
     
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to fetch current weather for {location}: {str(e)}")
+    except urllib.error.URLError as e:
+        logger.error(f"Failed to fetch weather for {city}: {str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error fetching weather for {city}: {str(e)}")
         return None
 
 @login_required
@@ -994,106 +1034,168 @@ def generate_excel_report(request, report_type, moisture_records, prediction_rec
     buffer.close()
     return response
 
-@login_required
-@role_required('admin')
-def predict_moisture(request):
-    if request.method == 'POST':
-        try:
-            location = request.POST.get('location')
-            current_moisture = float(request.POST.get('soil_moisture_percent'))
-            temperature = float(request.POST.get('temperature'))
-            humidity = float(request.POST.get('humidity'))
-            
-            weather_forecast = get_weather_forecast(location)
-            
-            # Make prediction
-            prediction = predict_soil_status(
-                location, current_moisture, temperature, humidity, weather_forecast
-            )
-            
-            # Store prediction
-            SoilMoisturePrediction.objects.create(
-                location=location,
-                predicted_moisture=round(prediction, 2),
-                current_moisture=current_moisture,
-                temperature=temperature,
-                humidity=humidity,
-                precipitation=weather_forecast['precipitation'],
-                prediction_for=datetime.now() + timedelta(hours=24)
-            )
-            
-            # Store prediction in context
-            context = {
-                'prediction': round(prediction, 2),
-                'location': location,
-                'current_moisture': current_moisture,
-                'temperature': temperature,
-                'humidity': humidity,
-            }
-            return render(request, 'dashboards/prediction_result.html', context)
-        
-        except ValueError as e:
-            messages.error(request, f"Invalid input: {str(e)}")
-            return redirect('admin_dashboard')
-    
-    return render(request, 'dashboards/admin_dashboard.html')
 
+from .models import TechnicianSoilMoisturePrediction
+
+def get_locations():
+    """
+    Retrieve distinct locations from historical data or predictions.
+    """
+    try:
+        # Fetch distinct locations from SoilMoistureRecord
+        locations = SoilMoistureRecord.objects.values_list('location', flat=True).distinct()
+        # Optionally include locations from TechnicianSoilMoisturePrediction
+        prediction_locations = TechnicianSoilMoisturePrediction.objects.values_list('location', flat=True).distinct()
+        # Combine and remove duplicates
+        all_locations = sorted(set(locations).union(set(prediction_locations)))
+        return all_locations if all_locations else ['Kampala']
+    except Exception as e:
+        logger.error(f"Error fetching locations: {str(e)}")
+        return ['Kampala']
+                                            
+                                            
+                                            
+from .soil_moisture_ml_model import SoilMoistureClassifier
+from .models import SoilMoistureRecord
+from django.utils import timezone
 
 @login_required
 @role_required('technician')
-def technician_predict_moisture(request):
-    technician = request.user
-    assigned_farms = TechnicianLocationAssignment.objects.filter(technician=technician)
-    assigned_locations = assigned_farms.values_list('location', flat=True).distinct()
+def technician_predict_moisture_view(request):
+    """
+    Handle both GET and POST requests for soil moisture prediction.
+    """
 
-    if request.method == 'POST':
-        location = request.POST.get('location')
-        if location not in assigned_locations:
-            messages.error(request, "You can only make predictions for assigned farms.")
-            return redirect('technician_dashboard')
+    try:
+        classifier = SoilMoistureClassifier()
 
-        try:
-            current_moisture = float(request.POST.get('soil_moisture_percent'))
-            temperature = float(request.POST.get('temperature'))
-            humidity = float(request.POST.get('humidity'))
+        # If model isn't loaded, try to train it with default data
+        if not classifier.model or not classifier.scaler:
+            try:
+                classifier.train_model_with_db_data()
+                messages.info(request, "Model trained successfully with historical data")
+            except Exception as train_error:
+                messages.error(request, f"Model initialization failed: {str(train_error)}")
+                return redirect('technician_predict_moisture')
             
-            weather_forecast = get_weather_forecast(location)
-
-            # Handle case when weather forecast is None
-            if weather_forecast is None:
-                precipitation = 0  # Default value if weather API fails
-            else:
-                precipitation = weather_forecast.get('rain', {}).get('1h', 0)
-            
-            prediction = predict_soil_status(
-                location, current_moisture, temperature, humidity, weather_forecast
-            )
-            
-            SoilMoisturePrediction.objects.create(
-                location=location,
-                predicted_moisture=round(prediction, 2),
-                current_moisture=current_moisture,
-                temperature=temperature,
-                humidity=humidity,
-                precipitation=precipitation,  # Fixed variable name here
-                prediction_for=datetime.now() + timedelta(hours=24)
-            )
-            
-            # Store prediction data in session
-            request.session['prediction_data'] = {
-                'prediction': round(prediction, 2),
-                'location': location,
-                'current_moisture': current_moisture,
-                'temperature': temperature,
-                'humidity': humidity,
+        if request.method == 'GET':
+        # Handle GET requests to display the prediction form
+            context = {
+                'locations': get_locations(),
+                'weather_location': None,
+                'current_moisture': None,
+                'temperature': None,
+                'humidity': None,
+                'forecast_table': [],
             }
-            return redirect('technician_dashboard')
-        
-        except ValueError as e:
-            messages.error(request, f"Invalid input: {str(e)}")
-            return redirect('technician_dashboard')
+            return render(request, 'dashboards/technician_dashboard.html', context)
     
-    context = {
-        'locations': assigned_locations,
-    }
-    return render(request, 'dashboards/prediction_form.html', context)
+        elif request.method == 'POST':
+            # Handle POST requests to process prediction form and generate forecast
+            try:
+                # Extract form data
+                location = request.POST.get('location')
+                current_moisture = float(request.POST.get('soil_moisture_percent'))
+                temperature = float(request.POST.get('temperature'))
+                humidity = float(request.POST.get('humidity'))
+
+                # Validate inputs
+                if not (0 <= current_moisture <= 100 and -50 <= temperature <= 50 and 0 <= humidity <= 100):
+                    messages.error(request, "Invalid input values. Please check your inputs.")
+                    return redirect('technician_predict_moisture')
+
+                # Get 7-day forecast
+                forecast = classifier.predict_future_moisture(
+                    location=location,
+                    current_moisture=current_moisture,
+                    temperature=temperature,
+                    humidity=humidity,
+                    days=7
+                )
+
+                # Save predictions to database
+                for prediction in forecast:
+                    # Ensure timestamp is timezone-aware
+                    dt = prediction['datetime']
+                    if timezone.is_naive(dt):
+                        dt = timezone.make_aware(dt)
+                    TechnicianSoilMoisturePrediction.objects.create(
+                        location=location,
+                        timestamp=dt,
+                        current_moisture=current_moisture,
+                        temperature=prediction['temperature'],
+                        humidity=prediction['humidity'],
+                        precipitation=prediction['precipitation'],
+                        predicted_category=prediction['predicted_category'],
+                        predicted_moisture_value=prediction['predicted_moisture_value'],
+                        confidence=prediction['confidence']
+                    )
+
+                # Prepare chart data
+                chart_data = {
+                    'labels': [pred['date'] for pred in forecast],
+                    'moisture': [pred['predicted_moisture_value'] for pred in forecast],
+                    'temperature': [pred['temperature'] for pred in forecast],
+                    'humidity': [pred['humidity'] for pred in forecast]
+                }
+
+                 # Prepare forecast table for template
+                forecast_table = [
+                    {
+                        'date': pred['date'],
+                        'moisture': round(pred['predicted_moisture_value'], 2),
+                        'temperature': round(pred['temperature'], 2),
+                        'humidity': round(pred['humidity'], 2)
+                    }
+                    for pred in forecast
+                ]
+
+                # Prepare simplified chart data
+                chart_data = {
+                    'labels': [pred['date'] for pred in forecast],
+                    'datasets': [
+                        {
+                            'label': 'Predicted Moisture (%)',
+                            'data': [round(pred['predicted_moisture_value'], 2) for pred in forecast],
+                            'borderColor': '#1E90FF',
+                            'backgroundColor': 'rgba(30, 144, 255, 0.2)',
+                            'yAxisID': 'y1'
+                        },
+                        {
+                            'label': 'Temperature (°C)',
+                            'data': [round(pred['temperature'], 2) for pred in forecast],
+                            'borderColor': '#FF4500',
+                            'backgroundColor': 'rgba(255, 69, 0, 0.2)',
+                            'yAxisID': 'y2'
+                        },
+                        {
+                            'label': 'Humidity (%)',
+                            'data': [round(pred['humidity'], 2) for pred in forecast],
+                            'borderColor': '#32CD32',
+                            'backgroundColor': 'rgba(50, 205, 50, 0.2)',
+                            'yAxisID': 'y1'
+                        }
+                    ]
+                }
+
+                context = {
+                    'locations': get_locations(),
+                    'weather_location': location,
+                    'current_moisture': current_moisture,
+                    'temperature': temperature,
+                    'humidity': humidity,
+                    'forecast_table': forecast_table,
+                    'chart_data_json': json.dumps(chart_data)
+                }
+
+                messages.success(request, "Predictions generated successfully!")
+                return render(request, 'dashboards/technician_dashboard.html', context)
+            except Exception as e:
+                messages.error(request, f"Error generating predictions: {str(e)}")
+                return redirect('technician_predict_moisture')
+
+    except Exception as e:
+        messages.error(request, f"Error generating predictions: {str(e)}")
+        return redirect('technician_predict_moisture')
+
+

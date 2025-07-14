@@ -40,9 +40,13 @@ def determine_soil_status(soil_moisture, humidity, temperature):
         str: Soil status ('Critical Low', 'Dry', 'Normal', 'Wet', 'Critical High')
     """
     # Initialize scores for each factor
-    moisture_score = 0
-    humidity_score = 0
-    temp_score = 0
+    try:
+        soil_moisture = float(soil_moisture)
+        humidity = float(humidity)
+        temperature = float(temperature)
+    except (ValueError, TypeError) as e:
+        logger.error(f"Error converting inputs to float: {e}")
+        return "Unknown"
     
     # Soil Moisture scoring
     if soil_moisture < 30:

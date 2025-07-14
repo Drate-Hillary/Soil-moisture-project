@@ -14,6 +14,56 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{% static 'css/admin.css' %}">
+    <style>
+        /* Notification Container */
+        .notification-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            width: 400px;
+        }
+
+        /* Notification Card */
+        .notification-card {
+            font-size: 0.85rem;
+            font-weight: 500;
+            background-color: white;
+            border-radius: 5px;
+            padding: 8px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            opacity: 0;
+            transform: translateX(100%);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        /* Slide-in Animation */
+        .notification-card.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        /* Success Message Styling */
+        .notification-card.success {
+            border: 1px solid #28a745;
+        }
+
+        /* Error Message Styling */
+        .notification-card.error {
+            border: 1px solid #dc3545;
+        }
+
+        /* Warning Message Styling (optional, for completeness) */
+        .notification-card.warning {
+            border: 2px solid #ffc107;
+        }
+
+        /* Info Message Styling (optional) */
+        .notification-card.info {
+            border: 2px solid #17a2b8;
+        }
+    </style>
 </head>
 
 <body>
@@ -25,37 +75,21 @@
             []
         {% endif %}
     </script>
+
     <!-- Sidebar Navigation -->
     <div class="sidebar">
         <div class="sidebar-header">
             <h4>Admin Dashboard</h4>
         </div>
         <ul class="nav flex-column">
-            <li class="nav-item">
-                <a class="nav-link active" href="#dashboard">Dashboard</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="#data-ingestion">Data Ingestion</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="#records">Soil Moisture Records</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="#ml-models">ML Models</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="#predictions">Predictions</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="#technicians">Technician Management</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="#notifications">Notifications</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="#reports">Reports</a>
-            </li>
-
+            <li class="nav-item"><a class="nav-link active" href="#dashboard">Dashboard</a></li>
+            <li class="nav-item"><a class="nav-link" href="#data-ingestion">Data Ingestion</a></li>
+            <li class="nav-item"><a class="nav-link" href="#records">Soil Moisture Records</a></li>
+            <li class="nav-item"><a class="nav-link" href="#ml-models">ML Models</a></li>
+            <li class="nav-item"><a class="nav-link" href="#predictions">Predictions</a></li>
+            <li class="nav-item"><a class="nav-link" href="#technicians">Technician Management</a></li>
+            <li class="nav-item"><a class="nav-link" href="#notifications">Notifications</a></li>
+            <li class="nav-item"><a class="nav-link" href="#reports">Reports</a></li>
         </ul>
     </div>
 
@@ -69,6 +103,16 @@
             <a href="{% url 'logout' %}" class="btn btn-outline-danger ms-auto">Logout</a>
         </header>
 
+        <!-- Notification Container -->
+        <div class="notification-container" id="notificationContainer">
+            {% if messages %}
+            {% for message in messages %}
+            <div class="notification-card {{ message.tags }} show">
+                {{ message }}
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
 
         <!-- Dashboard Section -->
         <section id="dashboard" class="content-section">
@@ -116,7 +160,6 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="col-md-4">
                     <div class="card">
                         <div class="card-body">
@@ -161,14 +204,6 @@
             <h3>Data Ingestion</h3>
             <div class="card">
                 <div class="card-body">
-                    <!-- <h5>Configure IoT Devices</h5>
-                    <form>
-                        <div class="mb-3">
-                            <label for="iot-api" class="form-label">API Endpoint</label>
-                            <input type="text" class="form-control" id="iot-api" placeholder="e.g., mqtt://broker.com">
-                        </div>
-                        <button type="submit" class="btn btn-primary">Save Config</button>
-                    </form> -->
                     <h5>CSV Upload</h5>
                     <form method="POST" enctype="multipart/form-data" action="{% url 'upload_csv' %}">
                         {% csrf_token %}
@@ -177,28 +212,9 @@
                         </div>
                         <button type="submit" class="btn btn-primary">Upload</button>
                     </form>
-                    {% if messages %}
-                    <div class="mt-3">
-                        {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
                 </div>
             </div>
         </section>
-
-        <!-- Database Management Section
-        <section id="database" class="content-section">
-            <h3>Database Management</h3>
-            <div class="card">
-                <div class="card-body">
-                    <h5>Storage Metrics</h5>
-                    <p>Records: </strong>10,234 | Size: 1.2 GB</p>
-                    <button class="btn btn-warning">Archive Data</button>
-                </div>
-            </div>
-        </section> -->
 
         <!-- Soil Moisture Records Section -->
         <section id="records" class="content-section">
@@ -278,71 +294,179 @@
                 </div>
             </div>
         </section>
+
         <!-- ML Models Section -->
         <section id="ml-models" class="content-section">
             <h3>ML Models</h3>
+
+            <!-- Irrigation Model Card -->
             <div class="card">
                 <div class="card-body">
-                    <h5>Upload Model</h5>
+                    <h5>Upload Irrigation Model</h5>
                     <form method="POST" enctype="multipart/form-data" action="{% url 'upload_model' %}">
                         {% csrf_token %}
+                        <input type="hidden" name="model_type" value="irrigation">
                         <div class="mb-3">
-                            <input type="file" class="form-control" id="ml-model-upload" name="ml-model-upload"
-                                accept=".pkl, .h5">
+                            <input type="file" class="form-control" id="irrigation-model-upload"
+                                name="irrigation-ml-model-upload" accept=".pkl, .h5" required>
                         </div>
                         <div class="form-check mb-3">
-                            <input type="checkbox" class="form-check-input" id="retrain" name="retrain">
-                            <label class="form-check-label" for="retrain">Retrain model with latest data</label>
+                            <input type="checkbox" class="form-check-input" id="retrain-irrigation"
+                                name="irrigation-retrain">
+                            <label class="form-check-label" for="retrain-irrigation">Retrain model with latest
+                                data</label>
                         </div>
-                        <button type="submit" class="btn btn-primary">Upload & Retrain</button>
+                        <button type="submit" class="btn btn-primary">Upload & Retrain Irrigation Model</button>
                     </form>
-                    <h5>Model Performance</h5>
-                    {% if model_metrics.rmse and model_metrics.r2_score %}
-                    <p>Accuracy: {{ model_metrics.r2_score }}% | RMSE: {{ model_metrics.rmse }}</p>
+                    <h5 class="mt-3">Model Performance</h5>
+                    {% if irrigation_metrics.rmse and irrigation_metrics.r2_score %}
+                    <p>Accuracy: {{ irrigation_metrics.r2_score }}% | RMSE: {{ irrigation_metrics.rmse }}</p>
                     {% else %}
-                    <p>No model performance metrics available.</p>
+                    <p>No irrigation model performance metrics available.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Soil Moisture Model Card -->
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h5>Upload Soil Moisture Model</h5>
+                    <form method="POST" enctype="multipart/form-data" action="{% url 'upload_model' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="model_type" value="soil_moisture">
+                        <div class="mb-3">
+                            <input type="file" class="form-control" id="soil-moisture-model-upload"
+                                name="soil-moisture-ml-model-upload" accept=".pkl, .h5" required>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" id="retrain-soil-moisture"
+                                name="soil-moisture-retrain">
+                            <label class="form-check-label" for="retrain-soil-moisture">Retrain model with latest
+                                data</label>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Upload & Retrain Soil Moisture Model</button>
+                    </form>
+                    <h5 class="mt-3">Model Performance</h5>
+                    {% if soil_moisture_metrics.rmse and soil_moisture_metrics.r2_score %}
+                    <p>Accuracy: {{ soil_moisture_metrics.r2_score }}% | RMSE: {{ soil_moisture_metrics.rmse }}</p>
+                    {% else %}
+                    <p>No soil moisture model performance metrics available.</p>
                     {% endif %}
                 </div>
             </div>
         </section>
 
         <!-- Predictions Section -->
-        <section id="predictions" class="content-section">
-            <h3>Predictions</h3>
-            <div class="card">
+        <!-- Predictions -->
+        <div class="container mt-4">
+            <h2>Soil Moisture Predictions for {{ weather_location|default:"No Location" }}</h2>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Current Conditions</h5>
+                </div>
                 <div class="card-body">
-                    <h5>Prediction Input</h5>
-                    <form method="POST" action="{% url 'predict_moisture' %}">
+                    <form method="POST" action="{% url 'technician_predict_moisture' %}">
                         {% csrf_token %}
-                        <div class="row g-3">
+                        <div class="row">
                             <div class="col-md-3">
-                                <input type="text" class="form-control" name="location" placeholder="Location" required>
+                                <div class="form-group">
+                                    <label for="location"><strong>Location</strong></label>
+                                    <select class="form-control" id="location" name="location" required>
+                                        {% for loc in locations %}
+                                        <option value="{{ loc }}" {% if loc == selected_location %}selected{% endif %}>{{
+                                            loc }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
                             </div>
                             <div class="col-md-3">
-                                <input type="number" step="0.1" class="form-control" name="soil_moisture_percent"
-                                    placeholder="Moisture (%)" required>
+                                <div class="form-group">
+                                    <label for="current_moisture"><strong>Current Moisture (%)</strong></label>
+                                    <input type="number" class="form-control" id="current_moisture"
+                                        name="soil_moisture_percent" step="0.01"
+                                        value="{{ current_moisture|default_if_none:'' }}" required>
+                                </div>
                             </div>
                             <div class="col-md-3">
-                                <input type="number" step="0.1" class="form-control" name="temperature"
-                                    placeholder="Temperature (°C)" required>
+                                <div class="form-group">
+                                    <label for="temperature"><strong>Temperature (°C)</strong></label>
+                                    <input type="number" class="form-control" id="temperature" name="temperature"
+                                        step="0.01" value="{{ temperature|default_if_none:'' }}" required>
+                                </div>
                             </div>
                             <div class="col-md-3">
-                                <input type="number" step="0.1" class="form-control" name="humidity"
-                                    placeholder="Humidity (%)" required>
+                                <div class="form-group">
+                                    <label for="humidity"><strong>Humidity (%)</strong></label>
+                                    <input type="number" class="form-control" id="humidity" name="humidity" step="0.01"
+                                        value="{{ humidity|default_if_none:'' }}" required>
+                                </div>
                             </div>
-                            <div class="col-md-2">
+                            <div class="col-md-3 d-flex align-items-end">
                                 <button type="submit" class="btn btn-primary">Predict</button>
                             </div>
                         </div>
                     </form>
-                    {% if prediction %}
-                    <h5>Prediction Results</h5>
-                    <p>Predicted Moisture: {{ prediction }}% (Next 24h)</p>
-                    <canvas id="predictionChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5>7-Day Forecast</h5>
+                </div>
+                <div class="card-body">
+                    {% if chart_data %}
+                    <div class="chart-container" style="position: relative; height:400px; width:100%">
+                        <canvas id="forecastChart"></canvas>
+                    </div>
+
+                    <div class="mt-3">
+                        <h6>Key Metrics</h6>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="metric-card">
+                                    <span class="metric-label">Highest Moisture</span>
+                                    <span class="metric-value">{{ chart_data.data.datasets.0.data|max }}%</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="metric-card">
+                                    <span class="metric-label">Lowest Moisture</span>
+                                    <span class="metric-value">{{ chart_data.data.datasets.0.data|min }}%</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="metric-card">
+                                    <span class="metric-label">Average Moisture</span>
+                                    <span class="metric-value">
+                                        {{ chart_data.data.datasets.0.data|average|floatformat:2 }}%
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        No predictions available. Submit the form to generate a forecast.
+                    </div>
                     {% endif %}
                 </div>
             </div>
-        </section>
+        </div>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                // Check if chart data exists
+                const chartDataElement = document.getElementById('chartData');
+                if (chartDataElement) {
+                    const chartData = JSON.parse(chartDataElement.textContent);
+
+                    // Create forecast chart
+                    const forecastCtx = document.getElementById('forecastChart').getContext('2d');
+                    new Chart(forecastCtx, chartData);
+                }
+            });
+        </script>
 
         <!-- Technician Management -->
         <section id="technicians" class="content-section">
@@ -453,32 +577,6 @@
                 </div>
             </div>
 
-            <!-- Add New Technician -->
-            <!-- <div class="card mt-4">
-                <div class="card-body">
-                    <h5>Add New Technician</h5>
-                    <form method="POST" action="{% url 'add_technician' %}">
-                        {% csrf_token %}
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <input type="text" class="form-control" name="first_name" placeholder="First Name"
-                                    required>
-                            </div>
-                            <div class="col-md-4">
-                                <input type="text" class="form-control" name="last_name" placeholder="Last Name"
-                                    required>
-                            </div>
-                            <div class="col-md-4">
-                                <input type="email" class="form-control" name="email" placeholder="Email" required>
-                            </div>
-                            <div class="col-md-12">
-                                <button type="submit" class="btn btn-success">Add Technician</button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div> -->
-
             <!-- Confirmation Modal -->
             <div class="modal fade" id="unassignConfirmModal" tabindex="-1" aria-labelledby="unassignConfirmModalLabel"
                 aria-hidden="true">
@@ -489,8 +587,7 @@
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
-                            Unassigning this technician will delete all soil moisture records for the selected location
-                            if no other technicians are assigned. Are you sure you want to proceed?
+                            Are you sure you want to unassign this technician from the selected location?
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -562,11 +659,32 @@
                 </div>
             </div>
         </section>
+    </div>
+    {% endblock %}
 
-        {% endblock %}
-        <!-- Bootstrap JS and Custom JS -->
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-        <script src="{% static 'JS/admin_scripts.js' %}"></script>
+    <!-- Bootstrap JS and Custom JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'js/admin_scripts.js' %}"></script>
+    <script>
+        // JavaScript for sliding notifications and auto-dismiss
+        document.addEventListener('DOMContentLoaded', function () {
+            const notifications = document.querySelectorAll('.notification-card');
+            notifications.forEach((notification, index) => {
+                // Show notification with slight delay for staggered effect
+                setTimeout(() => {
+                    notification.classList.add('show');
+                }, index * 200); // Stagger by 200ms per notification
+
+                // Auto-dismiss after 5 seconds
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => {
+                        notification.remove();
+                    }, 500); // Wait for slide-out animation to complete
+                }, 5000); // Display for 5 seconds
+            });
+        });
+    </script>
 </body>
 
 </html>
