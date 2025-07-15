@@ -9,7 +9,7 @@ import logging
 import csv
 import io
 from django.contrib import messages
-from .models import SoilMoistureRecord, SoilMoisturePrediction
+from .models import SoilMoistureRecord, SoilMoisturePrediction, Farm
 from datetime import datetime
 from .ml_model import predict_soil_status, train_model, get_model_metrics, get_irrigation_schedule_recommendation
 import os
@@ -212,9 +212,49 @@ def admin_dashboard(request):
     return render(request, 'dashboards/admin_dashboard.html', context)
 
 
-@role_required('farmer')
+@login_required
 def farmer_dashboard(request):
     if request.method == 'POST':
+        # Check if the request is for farm registration
+        if 'farm_name' in request.POST:
+            try:
+                # Extract farm registration form data
+                farm_name = request.POST.get('farm_name')
+                farm_size = request.POST.get('farm_size')
+                other_farm_name = request.POST.get('other_farm_name')
+                farm_description = request.POST.get('farm_description', '')
+
+                # Validate inputs
+                if not farm_size or float(farm_size) <= 0:
+                    messages.error(request, "Farm size must be a positive number.")
+                    return redirect('farmer_dashboard')
+
+                # Use other_farm_name if "Other" is selected, otherwise use farm_name
+                location = other_farm_name if farm_name == 'other' else farm_name
+                if not location:
+                    messages.error(request, "Please select or specify a valid farm location.")
+                    return redirect('farmer_dashboard')
+
+                # Create new Farm instance
+                Farm.objects.create(
+                    farmer=request.user,
+                    location=location,
+                    size=float(farm_size),
+                    description=farm_description
+                )
+                messages.success(request, f"Farm at {location} successfully registered!")
+                return redirect('farmer_dashboard')
+
+            except ValueError as e:
+                messages.error(request, f"Invalid input: {str(e)}")
+                logger.error(f"Farm registration error for farmer {request.user.email}: {str(e)}")
+                return redirect('farmer_dashboard')
+            except Exception as e:
+                messages.error(request, f"Error registering farm: {str(e)}")
+                logger.error(f"Farm registration error for farmer {request.user.email}: {str(e)}")
+                return redirect('farmer_dashboard')
+
+        # Existing soil status prediction logic
         try:
             # Extract form data
             soil_moisture = float(request.POST.get('soil-moisture'))
@@ -227,8 +267,8 @@ def farmer_dashboard(request):
             # Query soil moisture records
             records = SoilMoistureRecord.objects.all().order_by('-timestamp')
 
-            # Apply filters (corrected: filter by a single location, not multiple)
-            location = request.POST.get('location', '')  # Get location from POST if available
+            # Apply filters
+            location = request.POST.get('location', '')
             if location:
                 records = records.filter(location=location)
 
@@ -236,13 +276,19 @@ def farmer_dashboard(request):
             daily_averages = (
                 records.annotate(date=TruncDay('timestamp'))
                 .values('date')
-                .annotate(avg_moisture=Avg('soil_moisture_percent'))
+                .annotate(
+                    avg_moisture=Avg('soil_moisture_percent'),
+                    avg_temperature=Avg('temperature_celsius'),
+                    avg_humidity=Avg('humidity_percent')
+                )
                 .order_by('date')
             )
-    
+
             chart_data = {
                 'labels': [record['date'].strftime('%Y-%m-%d') for record in daily_averages],
-                'data': [round(record['avg_moisture'], 2) for record in daily_averages],
+                'moisture_data': [round(record['avg_moisture'], 2) for record in daily_averages],
+                'temperature_data': [round(record['avg_temperature'], 2) for record in daily_averages],
+                'humidity_data': [round(record['avg_humidity'], 2) for record in daily_averages],
             }
 
             # Make prediction using the ML model
@@ -259,12 +305,12 @@ def farmer_dashboard(request):
 
             # Store prediction in the database
             SoilMoisturePrediction.objects.create(
-                location='default',  # Use a default location since location is removed
+                location='default',
                 predicted_moisture=soil_moisture,
                 current_moisture=soil_moisture,
                 temperature=temperature,
                 humidity=humidity,
-                precipitation=0,  # Set precipitation to 0 since weather API is removed
+                precipitation=0,
                 prediction_for=datetime.now() + timedelta(hours=24),
                 status=prediction_result['status']
             )
@@ -283,6 +329,7 @@ def farmer_dashboard(request):
                 'locations': locations,
                 'selected_location': location,
                 'chart_data': json.dumps(chart_data),
+                'farms': Farm.objects.filter(farmer=request.user),  # Add user's farms
             }
 
             return render(request, 'dashboards/farmer_dashboard.html', context)
@@ -296,28 +343,31 @@ def farmer_dashboard(request):
             logger.error(f"Prediction error for farmer {request.user.email}: {str(e)}")
             return redirect('farmer_dashboard')
 
-    # GET request: Render dashboard with locations
+    # GET request: Render dashboard
     locations = SoilMoistureRecord.objects.values_list('location', flat=True).distinct()
-    # Set default location - use first location if available, otherwise a hardcoded default
     default_location = locations[0] if locations else "Nairobi"
-    
+
     # Get weather data
     current_weather = None
     if default_location:
         current_weather = get_weather_forecast(default_location)
+    
     records = SoilMoistureRecord.objects.all().order_by('-timestamp')
     if default_location:
         records = records.filter(location=default_location)
+    
     daily_averages = (
         records.annotate(date=TruncDay('timestamp'))
         .values('date')
         .annotate(avg_moisture=Avg('soil_moisture_percent'))
         .order_by('date')
     )
+    
     chart_data = {
         'labels': [record['date'].strftime('%Y-%m-%d') for record in daily_averages],
         'data': [round(record['avg_moisture'], 2) for record in daily_averages],
     }
+    
     context = {
         'user': request.user,
         'locations': locations,
@@ -325,7 +375,9 @@ def farmer_dashboard(request):
         'chart_data': json.dumps(chart_data),
         'current_weather': current_weather,
         'weather_location': default_location,
+        'farms': Farm.objects.filter(farmer=request.user),  # Add user's farms
     }
+    
     return render(request, 'dashboards/farmer_dashboard.html', context)
 
 
@@ -696,15 +748,12 @@ def unassign_technician(request):
                 remaining_assignments = TechnicianLocationAssignment.objects.filter(location=location).count()
                 if remaining_assignments == 0:
                     # Delete SoilMoistureRecord entries for this location
-                    deleted_count = SoilMoistureRecord.objects.filter(location=location).delete()[0]
                     messages.success(
                         request,
                         f"Technician {technician.get_full_name() or technician.username} unassigned from {location} "
-                        f"and {deleted_count} soil moisture records deleted."
                     )
                     logger.info(
                         f"Technician {technician.email} unassigned from location {location} by {request.user.email}. "
-                        f"{deleted_count} records deleted."
                     )
                 else:
                     messages.success(
@@ -913,8 +962,8 @@ def generate_report(request):
             timestamp__range=[start_date, end_date]
         ).order_by('timestamp')
         prediction_records = SoilMoisturePrediction.objects.filter(
-            timestamp__range=[start_date, end_date]
-        ).order_by('timestamp')
+            prediction_for__range=[start_date, end_date]
+        ).order_by('prediction_for')
 
         # Filter by assigned locations for technicians
         if request.user.role == 'technician':
@@ -923,16 +972,24 @@ def generate_report(request):
             moisture_records = moisture_records.filter(location__in=assigned_locations)
             prediction_records = prediction_records.filter(location__in=assigned_locations)
 
-        # Aggregate statistics
-        stats = moisture_records.aggregate(
-            avg_moisture=Avg('soil_moisture_percent'),
-            min_moisture=Min('soil_moisture_percent'),
-            max_moisture=Max('soil_moisture_percent')
-        )
+        # Aggregate statistics - improved version
         stats = {
-            'avg_moisture': float(stats['avg_moisture']) if stats['avg_moisture'] is not None else 0.0,
-            'min_moisture': float(stats['min_moisture']) if stats['min_moisture'] is not None else 0.0,
-            'max_moisture': float(stats['max_moisture']) if stats['max_moisture'] is not None else 0.0
+            'avg_moisture': moisture_records.aggregate(
+                avg=Avg('soil_moisture_percent')
+            )['avg'] or 0.0,
+            'min_moisture': moisture_records.aggregate(
+                min=Min('soil_moisture_percent')
+            )['min'] or 0.0,
+            'max_moisture': moisture_records.aggregate(
+                max=Max('soil_moisture_percent')
+            )['max'] or 0.0
+        }
+
+        # Convert to float and round
+        stats = {
+            'avg_moisture': round(float(stats['avg_moisture']), 2),
+            'min_moisture': round(float(stats['min_moisture']), 2),
+            'max_moisture': round(float(stats['max_moisture']), 2)
         }
 
         if format_type == 'pdf':
@@ -1019,7 +1076,7 @@ def generate_excel_report(request, report_type, moisture_records, prediction_rec
     ws.append(["Timestamp", "Location", "Predicted Moisture (%)", "Current Moisture (%)"])
     for pred in prediction_records:
         ws.append([
-            pred.timestamp.strftime('%Y-%m-%d %H:%M'),
+            pred.prediction_for.strftime('%Y-%m-%d %H:%M'),
             pred.location,
             pred.predicted_moisture,
             pred.current_moisture
@@ -1060,7 +1117,7 @@ from .models import SoilMoistureRecord
 from django.utils import timezone
 
 @login_required
-@role_required('technician')
+@roles_required('admin','technician')
 def technician_predict_moisture_view(request):
     """
     Handle both GET and POST requests for soil moisture prediction.
@@ -1197,5 +1254,4 @@ def technician_predict_moisture_view(request):
     except Exception as e:
         messages.error(request, f"Error generating predictions: {str(e)}")
         return redirect('technician_predict_moisture')
-
 

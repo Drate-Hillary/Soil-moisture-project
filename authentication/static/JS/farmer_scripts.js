@@ -10,170 +10,118 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Chart.js for Moisture Trends
     const moistureCtx = document.getElementById('moistureChart');
-    if (moistureCtx) {
-        // Get chart data from Django template variable
-        const chartDataElement = document.getElementById('chartData');
-        let chartData = null;
-        
-        if (chartDataElement) {
-            try {
-                chartData = JSON.parse(chartDataElement.textContent);
-            } catch (e) {
-                console.error('Error parsing chart data:', e);
-            }
-        }
-
-        if (chartData && chartData.labels && chartData.data) {
-            new Chart(moistureCtx.getContext('2d'), {
-                type: 'line',
-                data: {
-                    labels: chartData.labels,
-                    datasets: [{
-                        label: 'Average Soil Moisture (%)',
-                        data: chartData.data,
+    // Update the chart initialization code in admin_scripts.js
+    if (chartData && chartData.labels && chartData.moisture_data) {
+        new Chart(moistureCtx.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: chartData.labels,
+                datasets: [
+                    {
+                        label: 'Soil Moisture (%)',
+                        data: chartData.moisture_data,
                         borderColor: '#3498db',
                         backgroundColor: 'rgba(52, 152, 219, 0.1)',
                         borderWidth: 2,
                         fill: true,
                         tension: 0.4,
-                        pointBackgroundColor: '#3498db',
-                        pointBorderColor: '#ffffff',
-                        pointRadius: 5,
-                        pointHoverRadius: 7
-                    }]
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Temperature (°C)',
+                        data: chartData.temperature_data,
+                        borderColor: '#e74c3c',
+                        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.4,
+                        yAxisID: 'y1'
+                    },
+                    {
+                        label: 'Humidity (%)',
+                        data: chartData.humidity_data,
+                        borderColor: '#2ecc71',
+                        backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.4,
+                        yAxisID: 'y'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Environmental Trends'
+                    },
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false
+                    }
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
+                scales: {
+                    x: {
                         title: {
                             display: true,
-                            text: 'Daily Average Soil Moisture Trends'
+                            text: 'Date'
                         },
-                        legend: {
+                        grid: {
                             display: true,
-                            position: 'top'
+                            color: 'rgba(0,0,0,0.1)'
                         }
                     },
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Date'
-                            },
-                            grid: {
-                                display: true,
-                                color: 'rgba(0,0,0,0.1)'
-                            }
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Moisture/Humidity (%)'
                         },
-                        y: {
-                            beginAtZero: true,
-                            max: 100,
-                            title: {
-                                display: true,
-                                text: 'Moisture (%)'
-                            },
-                            grid: {
-                                display: true,
-                                color: 'rgba(0,0,0,0.1)'
-                            },
-                            ticks: {
-                                callback: function(value) {
-                                    return value + '%';
-                                }
+                        min: 0,
+                        max: 100,
+                        grid: {
+                            display: true,
+                            color: 'rgba(0,0,0,0.1)'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
                             }
                         }
                     },
-                    interaction: {
-                        intersect: false,
-                        mode: 'index'
-                    },
-                    hover: {
-                        animationDuration: 200
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Temperature (°C)'
+                        },
+                        grid: {
+                            drawOnChartArea: false,
+                            color: 'rgba(0,0,0,0.1)'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return value + '°C';
+                            }
+                        }
                     }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
                 }
-            });
-        } else {
-            // Display message when no data is available
-            const canvas = moistureCtx;
-            const ctx = canvas.getContext('2d');
-            ctx.font = '16px Arial';
-            ctx.fillStyle = '#666';
-            ctx.textAlign = 'center';
-            ctx.fillText('No data available for chart', canvas.width / 2, canvas.height / 2);
-        }
-    }
-
-    // Chart.js for Prediction Chart
-    const predictionCtx = document.getElementById('predictionChart');
-    if (predictionCtx) {
-        const predictionDataElement = document.getElementById('predictionData');
-        let predictions = null;
-        
-        if (predictionDataElement) {
-            try {
-                predictions = JSON.parse(predictionDataElement.textContent);
-            } catch (e) {
-                console.error('Error parsing prediction data:', e);
             }
-        }
-
-        if (predictions && predictions.length > 0) {
-            new Chart(predictionCtx.getContext('2d'), {
-                type: 'line',
-                data: {
-                    labels: predictions.map(p => new Date(p.timestamp).toLocaleString()),
-                    datasets: [{
-                        label: 'Predicted Moisture (%)',
-                        data: predictions.map(p => p.predicted_moisture),
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        backgroundColor: 'rgba(75, 192, 192, 0.1)',
-                        borderWidth: 2,
-                        fill: false,
-                        tension: 0.4,
-                        pointRadius: 4
-                    }, {
-                        label: 'Input Moisture (%)',
-                        data: predictions.map(p => p.input_moisture),
-                        borderColor: 'rgba(255, 99, 132, 1)',
-                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                        borderWidth: 2,
-                        fill: false,
-                        tension: 0.4,
-                        pointRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: 'Moisture Predictions vs Input Values'
-                        }
-                    },
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Timestamp'
-                            }
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text: 'Moisture (%)'
-                            },
-                            ticks: {
-                                callback: function(value) {
-                                    return value + '%';
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
+        });
     }
 
     // Handle section navigation
@@ -210,108 +158,3 @@ document.addEventListener('DOMContentLoaded', function() {
         dashboardSection.style.display = 'block';
     }
 });
-
-function updateChart(location) {
-    const canvas = document.getElementById('moistureChart');
-    if (!canvas) {
-        console.error('Canvas element with ID "moistureChart" not found.');
-        return;
-    }
-
-    const loadingIndicator = document.createElement('div');
-    loadingIndicator.id = 'loading';
-    loadingIndicator.textContent = 'Loading...';
-    canvas.parentNode.appendChild(loadingIndicator);
-
-    if (!location) {
-        if (moistureChart) {
-            moistureChart.destroy();
-            moistureChart = null;
-        }
-        canvas.style.display = 'none';
-        loadingIndicator.remove();
-        return;
-    }
-
-    canvas.style.display = 'block';
-
-    fetch(`/api/soil-moisture/?location=${encodeURIComponent(location)}`, {
-        method: 'GET',
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-    })
-        .then(response => {
-            loadingIndicator.remove();
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.error) {
-                console.error('Error from server:', data.error);
-                alert('No data available for this location.');
-                if (moistureChart) {
-                    moistureChart.destroy();
-                    moistureChart = null;
-                }
-                canvas.style.display = 'none';
-                return;
-            }
-
-            if (moistureChart) {
-                moistureChart.destroy();
-            }
-
-            const ctx = canvas.getContext('2d');
-            moistureChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: data.labels,
-                    datasets: [{
-                        label: `Soil Moisture (%) - ${location}`,
-                        data: data.data,
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                        borderWidth: 2,
-                        tension: 0.1,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                        },
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false,
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: false,
-                            title: {
-                                display: true,
-                                text: 'Soil Moisture (%)'
-                            }
-                        },
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Date'
-                            }
-                        }
-                    }
-                }
-            });
-        })
-        .catch(error => {
-            loadingIndicator.remove();
-            console.error('Error fetching data:', error);
-            alert('Failed to load moisture data. Please try again.');
-            canvas.style.display = 'none';
-        });
-}

@@ -2,6 +2,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 
 class CustomUser(AbstractUser):
     ROLE_CHOICES = (
@@ -82,3 +83,40 @@ class TechnicianSoilMoisturePrediction(models.Model):
 
     def __str__(self):
         return f"{self.location} - {self.timestamp.strftime('%Y-%m-%d %H:%M')} - {self.predicted_category}"
+    
+
+User = get_user_model()
+
+class Farm(models.Model):
+    farmer = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='farms')
+    location = models.CharField(max_length=100)
+    size = models.DecimalField(max_digits=10, decimal_places=2)  # in acres
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.farmer.username}'s farm at {self.location} ({self.size} acres)"
+    
+
+class Notification(models.Model):
+    sender = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='sent_notifications')
+    recipient = models.ForeignKey(Farm, on_delete=models.CASCADE, related_name='received_notifications')
+    subject = models.CharField(max_length=255)
+    message = models.TextField()
+    sent_at = models.DateTimeField()
+    status = models.CharField(max_length=20, choices=[('sent', 'Sent'), ('delivered', 'Delivered'), ('failed', 'Failed')])
+    notification_type = models.CharField(max_length=20, choices=[('alert', 'Alert'), ('warning', 'Warning'), ('info', 'Info')], default='info')
+
+    def __str__(self):
+        return f"Notification from {self.sender} to {self.recipient} - {self.subject}"
+
+    @property
+    def recipients_count(self):
+        return 1  # Since each notification is for one recipient
+
+    def get_notification_type_display(self):
+        return self.get_notification_type_display()
+
+    def get_status_display(self):
+        return self.get_status_display()

@@ -1,4 +1,3 @@
-{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 
@@ -6,6 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Technician Dashboard - Soil Moisture System</title>
+    {% load static %}
+
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
@@ -284,8 +285,8 @@
                 </div>
             </div>
         </section>
-    </div>
 
+        
     <!-- Bootstrap JS and Custom JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{% static 'JS/technician_scripts.js' %}"></script>
@@ -299,16 +300,16 @@
         function generateSampleData(currentMoisture, temperature, humidity, location) {
             const data = [];
             const today = new Date();
-            
+
             for (let i = 0; i < 7; i++) {
                 const date = new Date(today);
                 date.setDate(today.getDate() + i);
-                
+
                 // Simulate realistic moisture prediction variations
                 const moistureVariation = (Math.random() - 0.5) * 10; // ±5% variation
                 const tempVariation = (Math.random() - 0.5) * 6; // ±3°C variation
                 const humidityVariation = (Math.random() - 0.5) * 20; // ±10% variation
-                
+
                 data.push({
                     date: date.toISOString().split('T')[0],
                     moisture: Math.max(0, Math.min(100, currentMoisture + moistureVariation)),
@@ -322,7 +323,7 @@
         function updateForecastTable(forecastData) {
             const tbody = document.querySelector('#forecastTable tbody');
             tbody.innerHTML = '';
-            
+
             forecastData.forEach(row => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -337,12 +338,12 @@
 
         function createChart(forecastData) {
             const ctx = document.getElementById('soilMoistureChart').getContext('2d');
-            
+
             // Destroy existing chart if it exists
             if (chart) {
                 chart.destroy();
             }
-            
+
             // Prepare chart data that matches your Django structure
             const chartData = {
                 labels: forecastData.map(item => item.date),
@@ -434,25 +435,25 @@
         }
 
         // Form submission handler
-        document.getElementById('predictionForm').addEventListener('submit', function(e) {
+        document.getElementById('predictionForm').addEventListener('submit', function (e) {
             e.preventDefault();
-            
+
             const formData = new FormData(this);
             const currentMoisture = parseFloat(formData.get('soil_moisture_percent'));
             const temperature = parseFloat(formData.get('temperature'));
             const humidity = parseFloat(formData.get('humidity'));
             const location = formData.get('location');
-            
+
             // Generate sample forecast data
             const forecastData = generateSampleData(currentMoisture, temperature, humidity, location);
-            
+
             // Update table and chart
             updateForecastTable(forecastData);
             createChart(forecastData);
         });
 
         // Initialize with sample data
-        window.addEventListener('load', function() {
+        window.addEventListener('load', function () {
             const forecastData = generateSampleData(45, 25, 65, 'Kampala');
             updateForecastTable(forecastData);
             createChart(forecastData);

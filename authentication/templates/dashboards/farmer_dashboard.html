@@ -31,6 +31,9 @@
             <li class="nav-item">
                 <a class="nav-link" href="#reports">Reports</a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#register-farm">Register Farm</a>
+            </li>
         </ul>
     </div>
 
@@ -145,13 +148,12 @@
                         <h5>Soil Status Analysis</h5>
                         <div class="alert alert-info" id="status-alert">
                             <h4 id="status-text">{{ prediction.status }}</h4>
-                            <p id="status-description">
-                                Confidence: {{ prediction.confidence }}% (Method: {{ prediction.method }})<br>
-                                Input Values:
-                                Soil Moisture: {{ prediction.input_values.soil_moisture }}%,
-                                Temperature: {{ prediction.input_values.temperature }}°C,
+                            <div id="status-description">
+                                <strong>Input Values</strong>
+                                <small class="fs-8">Soil Moisture: {{ prediction.input_values.soil_moisture }}%</small>
+                                Temperature: {{ prediction.input_values.temperature }}°C
                                 Humidity: {{ prediction.input_values.humidity }}%
-                            </p>
+                            </div>
                         </div>
 
                         <div class="card mt-3">
@@ -190,6 +192,92 @@
                 </div>
             </div>
         </section>
+
+        <section id="register-farm" class="content-section">
+            <h3>Register New Farm</h3>
+            <div class="card">
+                <div class="card-body">
+                    <form id="farm-registration-form" method="POST" action="#">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="farm-name" class="form-label">Farm Location</label>
+                                    <select class="form-select" id="farm-name" name="farm_name" required>
+                                        <option value="">Select Location</option>
+                                        {% for location in locations %}
+                                        <option value="{{ location }}">{{ location }}</option>
+                                        {% endfor %}
+                                        <option value="other">Other (specify below)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="farm-size" class="form-label">Farm Size (acres)</label>
+                                    <input type="number" class="form-control" id="farm-size" name="farm_size" step="0.1" required>
+                                </div>
+                            </div>
+                        </div>
+                    
+                        <div class="row" id="other-farm-container" style="display: none;">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label for="other-farm-name" class="form-label">Specify Farm Location</label>
+                                    <input type="text" class="form-control" id="other-farm-name" name="other_farm_name">
+                                </div>
+                            </div>
+                        </div>
+                    
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label for="farm-description" class="form-label">Farm Description</label>
+                                    <textarea class="form-control" id="farm-description" name="farm_description" rows="3"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">Register Farm</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- Add this to display registered farms -->
+        {% if farms %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h4>Your Registered Farms</h4>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Location</th>
+                                <th>Size (acres)</th>
+                                <th>Description</th>
+                                <th>Registered On</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for farm in farms %}
+                            <tr>
+                                <td>{{ farm.location }}</td>
+                                <td>{{ farm.size }}</td>
+                                <td>{{ farm.description|default:"-" }}</td>
+                                <td>{{ farm.created_at|date:"Y-m-d" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
     </div>
 

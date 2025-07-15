@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import upload_csv, predict_moisture, upload_model, technician_predict_moisture_view  
+from .views import upload_csv, predict_moisture, upload_model 
 from django.contrib.auth.views import LogoutView
 
 urlpatterns = [
@@ -22,6 +22,7 @@ urlpatterns = [
     path('unassign-technician/', views.unassign_technician, name='unassign_technician'),
     path('add-technician/', views.add_technician, name='add_technician'), 
     path('technician/predict/', views.technician_predict_moisture_view, name='technician_predict_moisture'),
+    # path('register-farm', views.register_farm, name="regiter_farm")
    
 ]
 
