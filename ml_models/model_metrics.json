@@ -43,12 +43,12 @@
         "soil_moisture_percent",
         "temperature_celsius",
         "humidity_percent",
-        "month_sin",
         "moisture_lag_2",
         "temp_lag_1",
         "moisture_rolling_3",
         "humidity_rolling_3",
         "humidity_rolling_6",
+        "moisture_rolling_std",
         "moisture_change",
         "moisture_change_2",
         "temp_change_2",
@@ -64,7 +64,7 @@
         "dryness_index",
         "moisture_deficit",
         "humidity_stress_index",
-        "critical_low_risk"
+        "moisture_stability"
     ],
     "model_type": "VotingClassifier (RF + GB + ET)",
     "class_wise_performance": {

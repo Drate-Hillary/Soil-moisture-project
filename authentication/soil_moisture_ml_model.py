@@ -90,7 +90,7 @@ class SoilMoistureClassifier:
         """Load model from uploaded .pkl file"""
         try:
             # Save uploaded file temporarily
-            temp_path = os.path.join(settings.BASE_DIR, 'temp_model.pkl')
+            temp_path = os.path.join(settings.BASE_DIR, 'models', 'temp_model.pkl')
             with open(temp_path, 'wb') as f:
                 for chunk in uploaded_file.chunks():
                     f.write(chunk)

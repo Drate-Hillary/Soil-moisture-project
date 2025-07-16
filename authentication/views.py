@@ -14,7 +14,7 @@ from datetime import datetime
 from .ml_model import predict_soil_status, train_model, get_model_metrics, get_irrigation_schedule_recommendation
 import os
 import requests
-from .ml_model import train_model
+from .soil_moisture_ml_model import SoilMoistureClassifier
 from dotenv import load_dotenv
 from django.db.models.functions import TruncDay
 import json
@@ -670,7 +670,7 @@ def upload_model(request):
             # Optionally retrain the model
             if request.POST.get('irrigation-retrain'):
                 _, metrics = train_model()  # Get metrics from retraining
-                messages.success(request, f'Model retrained successfully! R² Score: {metrics["r2_score"]}% | RMSE: {metrics["rmse"]}')
+                messages.success(request, f'Model retrained successfully! Accuracy: {metrics["accuracy"]}%')
             else:
                 messages.success(request, 'Model uploaded successfully!')
             
@@ -681,46 +681,79 @@ def upload_model(request):
             return redirect('admin_dashboard')
     
 
-    return render(request, 'dashboards/admin_dashboard.html')
-
-# Upload a ml model
-@login_required
-@role_required('admin')
-def upload_model(request):
-    if request.method == 'POST':
-        model_file = request.FILES.get('soil-moisture-ml-model-upload')
-        if not model_file:
-            messages.error(request, 'No file uploaded.')
-            return redirect('admin_dashboard')
+def upload_model_soil_moisture(request): 
+    
+    if request.method == 'GET':
+        # Initialize classifier to get current model info
+        classifier = SoilMoistureClassifier()
+        model_info = classifier.get_model_info()
         
-        if not model_file.name.endswith(('.pkl', '.h5')):
-            messages.error(request, 'Please upload a valid model file (.pkl or .h5).')
-            return redirect('admin_dashboard')
+        context = {
+            'model_info': model_info,
+            'soil_moisture_metrics': {
+                'rmse': None,
+                'r2_score': None
+            }
+        }
+        
+        return render(request, 'dashboards/admin_dashboard.html', context)
+    
+    elif request.method == 'POST':
+        # Check if file was uploaded
+        if 'soil-moisture-ml-model-upload' not in request.FILES:
+            messages.error(request, "No file was uploaded")
+            return redirect('upload_model_soil_moisture')  # Adjust redirect URL
+        
+        uploaded_file = request.FILES['soil-moisture-ml-model-upload']
+        retrain = 'soil-moisture-retrain' in request.POST
+        
+        # Validate file extension
+        if not uploaded_file.name.endswith('.pkl'):
+            messages.error(request, "Only .pkl files are allowed")
+            return redirect('upload_model_soil_moisture')
+        
+        # Initialize classifier
+        classifier = SoilMoistureClassifier()
         
         try:
-            # Save the model file
-            model_path = os.path.join(settings.BASE_DIR, 'ml_models', model_file.name)
-            os.makedirs(os.path.dirname(model_path), exist_ok=True)
-            with open(model_path, 'wb') as f:
-                for chunk in model_file.chunks():
-                    f.write(chunk)
+            # Load the uploaded model
+            success = classifier.load_uploaded_model(uploaded_file)
             
-            # Optionally retrain the model
-            if request.POST.get('soil-moisture-retrain'):
-                _, metrics = train_model()  # Get metrics from retraining
-                messages.success(request, f'Model retrained successfully! R² Score: {metrics["r2_score"]}% | RMSE: {metrics["rmse"]}')
+            if not success:
+                messages.error(request, "Failed to load the uploaded model file")
+                return redirect('upload_model_soil_moisture')
+            
+            # If retrain is selected, train with historical data
+            metrics = None
+            if retrain:
+                try:
+                    metrics = classifier.train_model_with_db_data(retrain=True)
+                    messages.success(request, "Model uploaded and retrained successfully!")
+                except Exception as e:
+                    logger.error(f"Error retraining model: {str(e)}")
+                    messages.warning(request, f"Model uploaded but retraining failed: {str(e)}")
             else:
-                messages.success(request, 'Model uploaded successfully!')
+                messages.success(request, "Model uploaded successfully!")
             
-            return redirect('admin_dashboard')
-        
+            # Prepare context with model info and metrics
+            model_info = classifier.get_model_info()
+            
+            context = {
+                'model_info': model_info,
+                'soil_moisture_metrics': {
+                    'rmse': metrics.get('test_rmse', None) if metrics else None,
+                    'r2_score': metrics.get('test_r2', None) if metrics else None,
+                    'classification_report': metrics.get('classification_report', None) if metrics else None,
+                    'confusion_matrix': metrics.get('confusion_matrix', None) if metrics else None,
+                }
+            }
+            
+            return render(request, 'dashboards/admin_dashboard.html', context)
+            
         except Exception as e:
-            messages.error(request, f'Error uploading model: {str(e)}')
-            return redirect('admin_dashboard')
-    
-
-    return render(request, 'dashboards/admin_dashboard.html')
-
+            logger.error(f"Error processing uploaded model: {str(e)}")
+            messages.error(request, f"Error processing model: {str(e)}")
+            return redirect('upload_model_soil_moisture')
 
 @login_required
 @role_required('admin')

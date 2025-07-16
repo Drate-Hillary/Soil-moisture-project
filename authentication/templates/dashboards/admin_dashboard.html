@@ -330,12 +330,12 @@
             <div class="card mt-3">
                 <div class="card-body">
                     <h5>Upload Soil Moisture Model</h5>
-                    <form method="POST" enctype="multipart/form-data" action="{% url 'upload_model' %}">
+                    <form method="POST" enctype="multipart/form-data" action="{% url 'upload_model_soil_moisture' %}">
                         {% csrf_token %}
                         <input type="hidden" name="model_type" value="soil_moisture">
                         <div class="mb-3">
                             <input type="file" class="form-control" id="soil-moisture-model-upload"
-                                name="soil-moisture-ml-model-upload" accept=".pkl, .h5" required>
+                                name="soil-moisture-ml-model-upload" accept=".pkl" required>
                         </div>
                         <div class="form-check mb-3">
                             <input type="checkbox" class="form-check-input" id="retrain-soil-moisture"
