@@ -29,9 +29,6 @@
                 <a class="nav-link" href="#soil-status">Soil Status</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="#reports">Reports</a>
-            </li>
-            <li class="nav-item">
                 <a class="nav-link" href="#register-farm">Register Farm</a>
             </li>
         </ul>
@@ -67,30 +64,24 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4 col-sm-6">
-                    <div class="card">
-                        <div class="card-body">
-                            <h5>Today's Percipitation</h5>
-                            <p class="status-text">{{ current_weather.rain }} mm</p>
-                        </div>
-                    </div>
-                </div>
 
-
+                 <!-- Location Selector -->
                 <div class="col-md-12">
                     <div class="card">
                         <div class="card-body">
                             <div class="row mb-3">
                                 <div class="col-md-6">
-                                    <h5>Moisture Trends</h5>
+                                    <h5>Soil Moisture, Temperature, Humidity Trends</h5>
                                 </div>
                                 <div class="col-md-6">
-                                    <select id="locationSelect" class="form-select">
-                                        <option value="">Select Location</option>
-                                        {% for location in locations %}
-                                            <option value="{{ location }}" {% if location == selected_location %}selected{% endif %}>{{ location }}</option>
-                                        {% endfor %}
-                                    </select>
+                                    <form method="GET" action="{% url 'farmer_dashboard' %}">
+                                        <select id="locationSelect" name="location" class="form-select w-100" onchange="this.form.submit()">
+                                            <option value="">Select Location</option>
+                                            {% for location in locations %}
+                                                <option value="{{ location }}" {% if location == selected_location %}selected{% endif %}>{{ location }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </form>
                                 </div>
                             </div>
                             <canvas id="moistureChart"></canvas>
@@ -150,7 +141,7 @@
                             <h4 id="status-text">{{ prediction.status }}</h4>
                             <div id="status-description">
                                 <strong>Input Values</strong>
-                                <small class="fs-8">Soil Moisture: {{ prediction.input_values.soil_moisture }}%</small>
+                                Soil Moisture: {{ prediction.input_values.soil_moisture }}%,
                                 Temperature: {{ prediction.input_values.temperature }}°C
                                 Humidity: {{ prediction.input_values.humidity }}%
                             </div>
@@ -284,6 +275,63 @@
     <!-- Bootstrap JS and Custom JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{% static 'JS/farmer_scripts.js' %}"></script>
+    <!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Parse chart data from Django context
+    const chartData = JSON.parse('{{ chart_data | safe }}');
+
+    // Initialize Chart.js
+    const ctx = document.getElementById('moistureChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: chartData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Date'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Moisture / Humidity (%)'
+                    },
+                    min: 0,
+                    max: 100
+                },
+                y2: {
+                    type: 'linear',
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Temperature (°C)'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                title: {
+                    display: true,
+                    text: 'Soil Moisture, Temperature, and Humidity Trends for {{ selected_location }}'
+                }
+            }
+        }
+    });
+</script>
+
 </body>
 
 </html>

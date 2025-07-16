@@ -214,28 +214,50 @@ def admin_dashboard(request):
 
 @login_required
 def farmer_dashboard(request):
+    # Initialize context
+    context = {
+        'user': request.user,
+        'locations': [],
+        'selected_location': '',
+        'chart_data': '{}',
+        'current_weather': None,
+        'weather_location': None,
+        'farms': Farm.objects.filter(farmer=request.user),
+    }
+
+    # Get unique locations for dropdown
+    locations = SoilMoistureRecord.objects.values_list('location', flat=True).distinct()
+    context['locations'] = locations
+
+    # Default location
+    default_location = locations[0] if locations else "Nairobi"
+    selected_location = request.GET.get('location', default_location) if request.method == 'GET' else request.POST.get('location', default_location)
+    context['selected_location'] = selected_location
+
+    # Get weather data
+    if selected_location:
+        context['current_weather'] = get_weather_forecast(selected_location)
+        context['weather_location'] = selected_location
+
+    # Handle POST request for soil status prediction or farm registration
     if request.method == 'POST':
-        # Check if the request is for farm registration
         if 'farm_name' in request.POST:
+            # Farm registration logic (unchanged from original)
             try:
-                # Extract farm registration form data
                 farm_name = request.POST.get('farm_name')
                 farm_size = request.POST.get('farm_size')
                 other_farm_name = request.POST.get('other_farm_name')
                 farm_description = request.POST.get('farm_description', '')
 
-                # Validate inputs
                 if not farm_size or float(farm_size) <= 0:
                     messages.error(request, "Farm size must be a positive number.")
                     return redirect('farmer_dashboard')
 
-                # Use other_farm_name if "Other" is selected, otherwise use farm_name
                 location = other_farm_name if farm_name == 'other' else farm_name
                 if not location:
                     messages.error(request, "Please select or specify a valid farm location.")
                     return redirect('farmer_dashboard')
 
-                # Create new Farm instance
                 Farm.objects.create(
                     farmer=request.user,
                     location=location,
@@ -244,7 +266,6 @@ def farmer_dashboard(request):
                 )
                 messages.success(request, f"Farm at {location} successfully registered!")
                 return redirect('farmer_dashboard')
-
             except ValueError as e:
                 messages.error(request, f"Invalid input: {str(e)}")
                 logger.error(f"Farm registration error for farmer {request.user.email}: {str(e)}")
@@ -254,25 +275,16 @@ def farmer_dashboard(request):
                 logger.error(f"Farm registration error for farmer {request.user.email}: {str(e)}")
                 return redirect('farmer_dashboard')
 
-        # Existing soil status prediction logic
+        # Soil status prediction logic
         try:
-            # Extract form data
             soil_moisture = float(request.POST.get('soil-moisture'))
             temperature = float(request.POST.get('temperature'))
             humidity = float(request.POST.get('humidity'))
 
-            # Get unique locations for the dropdown
-            locations = SoilMoistureRecord.objects.values_list('location', flat=True).distinct()
+            # Query soil moisture records for selected location
+            records = SoilMoistureRecord.objects.filter(location=selected_location).order_by('-timestamp')
 
-            # Query soil moisture records
-            records = SoilMoistureRecord.objects.all().order_by('-timestamp')
-
-            # Apply filters
-            location = request.POST.get('location', '')
-            if location:
-                records = records.filter(location=location)
-
-            # Calculate daily averages for moisture trends chart
+            # Calculate daily averages for chart
             daily_averages = (
                 records.annotate(date=TruncDay('timestamp'))
                 .values('date')
@@ -286,9 +298,32 @@ def farmer_dashboard(request):
 
             chart_data = {
                 'labels': [record['date'].strftime('%Y-%m-%d') for record in daily_averages],
-                'moisture_data': [round(record['avg_moisture'], 2) for record in daily_averages],
-                'temperature_data': [round(record['avg_temperature'], 2) for record in daily_averages],
-                'humidity_data': [round(record['avg_humidity'], 2) for record in daily_averages],
+                'datasets': [
+                    {
+                        'label': 'Soil Moisture (%)',
+                        'data': [round(record['avg_moisture'], 2) for record in daily_averages],
+                        'borderColor': '#1E90FF',
+                        'backgroundColor': 'rgba(30, 144, 255, 0.2)',
+                        'yAxisID': 'y1',
+                        'fill': False
+                    },
+                    {
+                        'label': 'Temperature (°C)',
+                        'data': [round(record['avg_temperature'], 2) for record in daily_averages],
+                        'borderColor': '#FF4500',
+                        'backgroundColor': 'rgba(255, 69, 0, 0.2)',
+                        'yAxisID': 'y2',
+                        'fill': False
+                    },
+                    {
+                        'label': 'Humidity (%)',
+                        'data': [round(record['avg_humidity'], 2) for record in daily_averages],
+                        'borderColor': '#32CD32',
+                        'backgroundColor': 'rgba(50, 205, 50, 0.2)',
+                        'yAxisID': 'y1',
+                        'fill': False
+                    }
+                ]
             }
 
             # Make prediction using the ML model
@@ -305,7 +340,7 @@ def farmer_dashboard(request):
 
             # Store prediction in the database
             SoilMoisturePrediction.objects.create(
-                location='default',
+                location=selected_location,
                 predicted_moisture=soil_moisture,
                 current_moisture=soil_moisture,
                 temperature=temperature,
@@ -315,9 +350,7 @@ def farmer_dashboard(request):
                 status=prediction_result['status']
             )
 
-            # Prepare context for rendering results
-            context = {
-                'user': request.user,
+            context.update({
                 'prediction': {
                     'status': prediction_result['status'],
                     'irrigation_recommendation': prediction_result['irrigation_recommendation'],
@@ -326,11 +359,8 @@ def farmer_dashboard(request):
                     'input_values': prediction_result['input_values'],
                     'schedule': irrigation_schedule
                 },
-                'locations': locations,
-                'selected_location': location,
                 'chart_data': json.dumps(chart_data),
-                'farms': Farm.objects.filter(farmer=request.user),  # Add user's farms
-            }
+            })
 
             return render(request, 'dashboards/farmer_dashboard.html', context)
 
@@ -343,43 +373,56 @@ def farmer_dashboard(request):
             logger.error(f"Prediction error for farmer {request.user.email}: {str(e)}")
             return redirect('farmer_dashboard')
 
-    # GET request: Render dashboard
-    locations = SoilMoistureRecord.objects.values_list('location', flat=True).distinct()
-    default_location = locations[0] if locations else "Nairobi"
+    # GET request: Render dashboard with chart data
+    records = SoilMoistureRecord.objects.filter(location=selected_location).order_by('-timestamp')
 
-    # Get weather data
-    current_weather = None
-    if default_location:
-        current_weather = get_weather_forecast(default_location)
-    
-    records = SoilMoistureRecord.objects.all().order_by('-timestamp')
-    if default_location:
-        records = records.filter(location=default_location)
-    
+    # Calculate daily averages for chart
     daily_averages = (
         records.annotate(date=TruncDay('timestamp'))
         .values('date')
-        .annotate(avg_moisture=Avg('soil_moisture_percent'))
+        .annotate(
+            avg_moisture=Avg('soil_moisture_percent'),
+            avg_temperature=Avg('temperature_celsius'),
+            avg_humidity=Avg('humidity_percent')
+        )
         .order_by('date')
     )
-    
+
     chart_data = {
         'labels': [record['date'].strftime('%Y-%m-%d') for record in daily_averages],
-        'data': [round(record['avg_moisture'], 2) for record in daily_averages],
+        'datasets': [
+            {
+                'label': 'Soil Moisture (%)',
+                'data': [round(record['avg_moisture'], 2) for record in daily_averages],
+                'borderColor': '#1E90FF',
+                'backgroundColor': 'rgba(30, 144, 255, 0.2)',
+                'yAxisID': 'y1',
+                'fill': False
+            },
+            {
+                'label': 'Temperature (°C)',
+                'data': [round(record['avg_temperature'], 2) for record in daily_averages],
+                'borderColor': '#FF4500',
+                'backgroundColor': 'rgba(255, 69, 0, 0.2)',
+                'yAxisID': 'y2',
+                'fill': False
+            },
+            {
+                'label': 'Humidity (%)',
+                'data': [round(record['avg_humidity'], 2) for record in daily_averages],
+                'borderColor': '#32CD32',
+                'backgroundColor': 'rgba(50, 205, 50, 0.2)',
+                'yAxisID': 'y1',
+                'fill': False
+            }
+        ]
     }
-    
-    context = {
-        'user': request.user,
-        'locations': locations,
-        'selected_location': default_location,
-        'chart_data': json.dumps(chart_data),
-        'current_weather': current_weather,
-        'weather_location': default_location,
-        'farms': Farm.objects.filter(farmer=request.user),  # Add user's farms
-    }
-    
-    return render(request, 'dashboards/farmer_dashboard.html', context)
 
+    context.update({
+        'chart_data': json.dumps(chart_data),
+    })
+
+    return render(request, 'dashboards/farmer_dashboard.html', context)
 
 @login_required
 @role_required('technician')
